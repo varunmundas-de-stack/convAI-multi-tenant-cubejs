@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPG Analytics Chatbot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chat-container {
+            width: 90%;
+            max-width: 1000px;
+            height: 90vh;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .chat-header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .chat-header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            display: flex;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 12px 18px;
+            border-radius: 18px;
+            word-wrap: break-word;
+        }
+
+        .message.user .message-content {
+            background: #667eea;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.assistant .message-content {
+            background: white;
+            color: #333;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .message.user .message-time {
+            text-align: right;
+        }
+
+        .results-table {
+            margin-top: 15px;
+            overflow-x: auto;
+        }
+
+        .results-table table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .results-table th {
+            background: #667eea;
+            color: white;
+            padding: 10px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .results-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .results-table tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        .sql-section {
+            margin-top: 10px;
+        }
+
+        .sql-toggle {
+            background: #f0f0f0;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .sql-toggle:hover {
+            background: #e0e0e0;
+        }
+
+        .sql-query {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+            margin-top: 8px;
+            overflow-x: auto;
+        }
+
+        .diagnostic-section {
+            margin-top: 15px;
+            padding: 12px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .diagnostic-section h3 {
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .diagnostic-section.recommendations {
+            border-left-color: #4caf50;
+        }
+
+        .insights-list,
+        .recommendations-list,
+        .contributors-list {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .insights-list li,
+        .recommendations-list li,
+        .contributors-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .insights-list li:last-child,
+        .recommendations-list li:last-child,
+        .contributors-list li:last-child {
+            border-bottom: none;
+        }
+
+        .result-summary,
+        .diagnostic-meta {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .no-results {
+            color: #999;
+            font-style: italic;
+        }
+
+        .error-message {
+            color: #d32f2f;
+            padding: 10px;
+            background: #ffebee;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+
+        .metadata {
+            font-size: 11px;
+            color: #999;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #eee;
+        }
+
+        .suggestions {
+            padding: 15px 20px;
+            background: white;
+            border-bottom: 1px solid #eee;
+        }
+
+        .suggestions-title {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .suggestion-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .suggestion-chip {
+            background: #f0f0f0;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .suggestion-chip:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .chat-input-container {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #eee;
+        }
+
+        .chat-input-wrapper {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 12px 18px;
+            border: 2px solid #eee;
+            border-radius: 25px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .chat-input:focus {
+            border-color: #667eea;
+        }
+
+        .send-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .send-button:hover {
+            transform: scale(1.05);
+        }
+
+        .send-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 10px 15px;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: #999;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+            }
+            30% {
+                transform: translateY(-10px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>CPG Analytics Chatbot</h1>
+            <p>Ask questions about sales, distribution, and market insights</p>
+        </div>
+
+        <div class="suggestions" id="suggestions">
+            <div class="suggestions-title">Try asking:</div>
+            <div class="suggestion-chips" id="suggestionChips"></div>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+            <div class="message assistant">
+                <div class="message-content">
+                    <p>Hello! I'm your CPG Analytics assistant. I can help you analyze secondary sales data, track trends, and provide insights.</p>
+                    <p style="margin-top: 10px;">Try asking questions like:</p>
+                    <ul style="margin-top: 8px; padding-left: 20px;">
+                        <li>Show top 5 brands by sales value</li>
+                        <li>Weekly sales trend for last 6 weeks</li>
+                        <li>Why did sales change?</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="chat-input-container">
+            <div class="chat-input-wrapper">
+                <input
+                    type="text"
+                    id="chatInput"
+                    class="chat-input"
+                    placeholder="Ask a question about your CPG data..."
+                    autocomplete="off"
+                />
+                <button id="sendButton" class="send-button">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const chatMessages = document.getElementById('chatMessages');
+        const chatInput = document.getElementById('chatInput');
+        const sendButton = document.getElementById('sendButton');
+        const suggestionChips = document.getElementById('suggestionChips');
+
+        let isProcessing = false;
+
+        // Load suggestions
+        fetch('/api/suggestions')
+            .then(res => res.json())
+            .then(data => {
+                data.suggestions.forEach(suggestion => {
+                    const chip = document.createElement('button');
+                    chip.className = 'suggestion-chip';
+                    chip.textContent = suggestion;
+                    chip.onclick = () => {
+                        chatInput.value = suggestion;
+                        sendMessage();
+                    };
+                    suggestionChips.appendChild(chip);
+                });
+            });
+
+        // Send message on Enter key
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !isProcessing) {
+                sendMessage();
+            }
+        });
+
+        sendButton.addEventListener('click', sendMessage);
+
+        function sendMessage() {
+            const question = chatInput.value.trim();
+            if (!question || isProcessing) return;
+
+            // Add user message
+            addMessage('user', question);
+
+            // Clear input
+            chatInput.value = '';
+
+            // Disable input
+            isProcessing = true;
+            sendButton.disabled = true;
+            chatInput.disabled = true;
+
+            // Show typing indicator
+            const typingId = addTypingIndicator();
+
+            // Send to backend
+            fetch('/api/query', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ question })
+            })
+            .then(res => res.json())
+            .then(data => {
+                // Remove typing indicator
+                removeTypingIndicator(typingId);
+
+                if (data.success) {
+                    // Add assistant response
+                    addMessage('assistant', data.response, data.metadata);
+                } else {
+                    // Add error message
+                    addMessage('assistant', `<div class="error-message">${data.error}</div>`);
+                }
+            })
+            .catch(error => {
+                removeTypingIndicator(typingId);
+                addMessage('assistant', `<div class="error-message">Error: ${error.message}</div>`);
+            })
+            .finally(() => {
+                isProcessing = false;
+                sendButton.disabled = false;
+                chatInput.disabled = false;
+                chatInput.focus();
+            });
+        }
+
+        function addMessage(sender, content, metadata = null) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+
+            if (sender === 'user') {
+                contentDiv.textContent = content;
+            } else {
+                contentDiv.innerHTML = content;
+            }
+
+            // Add metadata if available
+            if (metadata) {
+                const metaDiv = document.createElement('div');
+                metaDiv.className = 'metadata';
+                metaDiv.innerHTML = `
+                    Intent: ${metadata.intent} |
+                    Confidence: ${(metadata.confidence * 100).toFixed(0)}% |
+                    Time: ${metadata.exec_time_ms.toFixed(0)}ms
+                `;
+                contentDiv.appendChild(metaDiv);
+            }
+
+            // Add timestamp
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = new Date().toLocaleTimeString();
+            contentDiv.appendChild(timeDiv);
+
+            messageDiv.appendChild(contentDiv);
+            chatMessages.appendChild(messageDiv);
+
+            // Scroll to bottom
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function addTypingIndicator() {
+            const id = 'typing-' + Date.now();
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message assistant';
+            messageDiv.id = id;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'typing-indicator';
+            typingDiv.innerHTML = '<span></span><span></span><span></span>';
+
+            contentDiv.appendChild(typingDiv);
+            messageDiv.appendChild(contentDiv);
+            chatMessages.appendChild(messageDiv);
+
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            return id;
+        }
+
+        function removeTypingIndicator(id) {
+            const element = document.getElementById(id);
+            if (element) {
+                element.remove();
+            }
+        }
+
+        function toggleSQL() {
+            const sqlQuery = document.getElementById('sqlQuery');
+            if (sqlQuery.style.display === 'none') {
+                sqlQuery.style.display = 'block';
+            } else {
+                sqlQuery.style.display = 'none';
+            }
+        }
+
+        // Focus input on load
+        chatInput.focus();
+    </script>
+</body>
+</html>

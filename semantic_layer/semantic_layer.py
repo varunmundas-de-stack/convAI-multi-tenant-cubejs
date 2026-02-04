@@ -13,9 +13,12 @@ try:
     from .schemas import SemanticQuery
     from .query_builder import ASTQueryBuilder
     from .compat import IntentAdapter
+    from .query_patterns import PatternRegistry
     AST_AVAILABLE = True
+    PATTERNS_AVAILABLE = True
 except ImportError:
     AST_AVAILABLE = False
+    PATTERNS_AVAILABLE = False
 
 
 class SemanticLayer:
@@ -31,6 +34,12 @@ class SemanticLayer:
         self.metrics = self._parse_metrics()
         self.dimensions = self._parse_dimensions()
         self.business_terms = self.config.get('business_terms', {})
+
+        # Initialize pattern registry if available
+        if PATTERNS_AVAILABLE:
+            self.pattern_registry = PatternRegistry()
+        else:
+            self.pattern_registry = None
 
     def _load_config(self) -> Dict:
         """Load semantic layer configuration"""
@@ -145,13 +154,14 @@ class SemanticLayer:
                     break
         return matches
 
-    def semantic_query_to_sql(self, semantic_query: 'SemanticQuery') -> SQLQuery:
+    def semantic_query_to_sql(self, semantic_query: 'SemanticQuery', apply_patterns: bool = True) -> SQLQuery:
         """
         NEW: AST-based SQL generation from SemanticQuery.
-        Type-safe, injection-proof SQL generation.
+        Type-safe, injection-proof SQL generation with optional pattern optimization.
 
         Args:
             semantic_query: Structured semantic query
+            apply_patterns: Whether to apply pattern-specific optimizations (default: True)
 
         Returns:
             SQLQuery: Generated SQL with metadata
@@ -160,6 +170,10 @@ class SemanticLayer:
             raise RuntimeError("AST builder not available. Install required dependencies.")
 
         try:
+            # Apply pattern-specific optimizations
+            if apply_patterns and self.pattern_registry:
+                semantic_query = self.pattern_registry.optimize_query(semantic_query)
+
             # Build query AST
             builder = ASTQueryBuilder(self)
             query_ast = builder.build_query(semantic_query)

@@ -289,3 +289,119 @@ Results + Audit Log
 **You're ready to go! 🚀**
 
 Start with the demo, then try your own queries.
+
+---
+
+## 8. Web Chatbot Interface (NEW!)
+
+**Interact with your CPG data through a beautiful chat interface!**
+
+### Quick Start
+
+**Option 1: Windows Batch File (Easiest)**
+
+```bash
+# Double-click this file or run from command prompt:
+start_chatbot.bat
+```
+
+**Option 2: Manual Start**
+
+```bash
+# From project root (Conv-AI-Project#1)
+python frontend\app.py
+```
+
+### Access the Chatbot
+
+1. Open your web browser
+2. Go to: **http://localhost:5000**
+3. Start asking questions!
+
+### Example Questions
+
+Try these in the chatbot:
+- "Show top 5 brands by sales value"
+- "Weekly sales trend for last 6 weeks"
+- "Top 10 SKUs by volume this month"
+- "Sales by state this month"
+- "Why did sales change?" (triggers diagnostic workflow)
+- "Compare sales by channel"
+
+### Features
+
+- **Natural Language Input:** Ask questions in plain English
+- **Rich Results:** Tables, trends, and diagnostic insights
+- **Query Suggestions:** Click quick suggestions to get started
+- **SQL Visibility:** View the generated SQL query
+- **Metadata Display:** See query intent, confidence, and execution time
+- **Diagnostic Workflows:** Automatic multi-query analysis for "why" questions
+
+### Chatbot Architecture
+
+```
+Web Browser (http://localhost:5000)
+    ↓
+Flask Backend (frontend/app.py)
+    ↓
+Intent Parser → Validator → RLS → Orchestrator
+    ↓
+Query Execution + Results Formatting
+    ↓
+JSON Response → Chat UI
+```
+
+### Troubleshooting
+
+**Issue: "Address already in use"**
+```bash
+# Another process is using port 5000. Stop it or use a different port:
+python frontend\app.py --port 5001
+```
+
+**Issue: "Template not found"**
+```bash
+# Make sure you're running from project root:
+cd Conv-AI-Project#1
+python frontend\app.py
+```
+
+**Issue: "Database connection failed"**
+```bash
+# Generate the database first:
+cd database
+python generate_cpg_data.py
+cd ..
+```
+
+### Customization
+
+Edit `frontend/app.py` to:
+- Change user context (role, access level, territories)
+- Add authentication
+- Customize result formatting
+- Add more query suggestions
+
+Edit `frontend/templates/chat.html` to:
+- Change UI colors/styling
+- Add charts/visualizations
+- Customize message formatting
+
+### Production Deployment
+
+For production use:
+1. Use a production WSGI server (gunicorn, waitress)
+2. Add authentication/authorization
+3. Enable Claude API for better accuracy
+4. Set up HTTPS
+5. Configure proper logging
+
+Example production start:
+```bash
+pip install waitress
+waitress-serve --host=0.0.0.0 --port=5000 frontend.app:app
+```
+
+---
+
+**Now you have both CLI and Web interfaces! Choose what works best for you.**

@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from semantic_layer.semantic_layer import SemanticLayer
 from semantic_layer.schemas import (
     SemanticQuery, MetricRequest, Dimensionality,
-    TimeContext, Filter, Sorting, IntentType
+    TimeContext, Filter, Sorting, IntentType, Diagnostics
 )
 from semantic_layer.validator import SemanticValidator
 from security.rls import RowLevelSecurity, UserContext
@@ -281,6 +281,107 @@ def demo_validation():
         console.print("[green]OK Valid query[/green]")
 
 
+
+
+def demo_query_patterns():
+    """Demo 5: Query Pattern Optimization"""
+    console = Console()
+
+    console.print("\n\n[bold cyan]Demo 5: Query Pattern Optimization[/bold cyan]\n")
+
+    semantic_layer = SemanticLayer("semantic_layer/config_cpg.yaml")
+    from semantic_layer.query_patterns import PatternRegistry
+
+    pattern_registry = PatternRegistry()
+
+    # Test 1: Trend Pattern
+    console.print("[bold]Test 1: Trend Pattern Optimization[/bold]")
+    trend_query = SemanticQuery(
+        intent=IntentType.TREND,
+        metric_request=MetricRequest(primary_metric="secondary_sales_value"),
+        dimensionality=Dimensionality(group_by=["brand_name"]),  # Missing time dim
+        time_context=TimeContext(window="last_6_weeks", grain="week"),
+        filters=[],
+        confidence=1.0,
+        original_question="Sales trend by brand"
+    )
+
+    console.print(f"Before optimization: group_by = {trend_query.dimensionality.group_by}")
+    optimized = pattern_registry.optimize_query(trend_query)
+    console.print(f"After optimization: group_by = {optimized.dimensionality.group_by}")
+    console.print(f"Sorting added: {optimized.sorting.order_by if optimized.sorting else 'None'}")
+
+    # Test 2: Ranking Pattern
+    console.print("\n[bold]Test 2: Ranking Pattern Optimization[/bold]")
+    ranking_query = SemanticQuery(
+        intent=IntentType.RANKING,
+        metric_request=MetricRequest(primary_metric="secondary_sales_volume"),
+        dimensionality=Dimensionality(group_by=["sku_name"]),
+        time_context=TimeContext(window="this_month"),
+        filters=[],
+        confidence=1.0,
+        original_question="Top SKUs by volume"
+    )
+
+    console.print(f"Before optimization: sorting = {ranking_query.sorting}")
+    optimized = pattern_registry.optimize_query(ranking_query)
+    console.print(f"After optimization: limit = {optimized.sorting.limit if optimized.sorting else 'None'}")
+    console.print(f"[green]OK[/green] Pattern optimization working")
+
+
+def demo_orchestrator():
+    """Demo 6: Query Orchestrator for Diagnostics"""
+    console = Console()
+
+    console.print("\n\n[bold cyan]Demo 6: Query Orchestrator - Diagnostic Workflow[/bold cyan]\n")
+
+    semantic_layer = SemanticLayer("semantic_layer/config_cpg.yaml")
+    from semantic_layer.orchestrator import QueryOrchestrator
+
+    executor = QueryExecutor("database/cpg_olap.duckdb")
+    orchestrator = QueryOrchestrator(semantic_layer, executor)
+
+    # Diagnostic query
+    diagnostic_query = SemanticQuery(
+        intent=IntentType.DIAGNOSTIC,
+        metric_request=MetricRequest(primary_metric="secondary_sales_value"),
+        dimensionality=Dimensionality(group_by=[]),
+        time_context=TimeContext(window="last_6_weeks", grain="week"),
+        filters=[],
+        diagnostics=Diagnostics(
+            enabled=True,
+            diagnostic_type="contribution",
+            dimensions=["brand_name", "state_name"]
+        ),
+        confidence=1.0,
+        original_question="Why did sales change?"
+    )
+
+    console.print("[yellow]Executing diagnostic workflow...[/yellow]")
+    result = orchestrator.execute(diagnostic_query)
+
+    console.print(f"\n[bold]Diagnostic Results:[/bold]")
+    console.print(f"Total queries executed: {result['metadata']['total_queries']}")
+    console.print(f"Total execution time: {result['metadata']['total_execution_time_ms']:.2f}ms")
+
+    # Show analysis
+    analysis = result['analysis']
+    console.print("\n[bold]Trend Analysis:[/bold]")
+    trend = analysis['trend_analysis']
+    console.print(f"  Direction: {trend['direction']}")
+    console.print(f"  Change: {trend['change_pct']:.1f}%")
+
+    console.print("\n[bold]Key Insights:[/bold]")
+    for insight in analysis['insights']:
+        console.print(f"  {insight}")
+
+    console.print("\n[bold]Recommendations:[/bold]")
+    for rec in analysis['recommendations']:
+        console.print(f"  {rec}")
+
+    console.print(f"\n[green]OK[/green] Diagnostic workflow completed")
+
+
 def main():
     """Run all demos"""
     console = Console()
@@ -296,8 +397,10 @@ def main():
         demo_with_security()
         demo_with_audit()
         demo_validation()
+        demo_query_patterns()
+        demo_orchestrator()
 
-        console.print("\n\n[bold green]OK All demos completed successfully![/bold green]\n")
+        console.print("\n\n[bold green]OK All 6 demos completed successfully![/bold green]\n")
 
     except Exception as e:
         console.print(f"\n[bold red]Error:[/bold red] {e}")

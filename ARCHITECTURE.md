@@ -278,6 +278,8 @@ Conv-AI-Project#1/
 │   ├── semantic_layer.py           # Core semantic layer
 │   ├── ast_builder.py              # AST node definitions
 │   ├── query_builder.py            # AST query builder
+│   ├── query_patterns.py           # Query pattern grammar (NEW)
+│   ├── orchestrator.py             # Multi-query orchestrator (NEW)
 │   ├── validator.py                # Query validation
 │   ├── compat.py                   # Backward compatibility
 │   └── models.py                   # Legacy models
@@ -293,12 +295,19 @@ Conv-AI-Project#1/
 ├── query_engine/
 │   └── executor.py                 # Query executor
 │
-├── connectors/
-│   └── duckdb_connector.py         # DuckDB connector
+├── frontend/                        # Web chatbot interface (NEW)
+│   ├── app.py                      # Flask backend API
+│   └── templates/
+│       └── chat.html               # Chat UI
 │
-├── demo_cpg_system.py              # Comprehensive demo
+├── logs/                            # Audit logs directory
+│   └── audit.jsonl                 # Query audit trail
+│
+├── demo_cpg_system.py              # Comprehensive demo (6 demos)
+├── start_chatbot.bat               # Windows chatbot launcher (NEW)
 ├── requirements.txt                # Dependencies
-└── README_CPG.md                   # This file
+├── ARCHITECTURE.md                 # Architecture documentation
+└── SETUP_GUIDE.md                  # Setup instructions
 ```
 
 ## Testing
@@ -371,16 +380,26 @@ pytest tests/
 
 ## Roadmap
 
-### Phase 3: Query Pattern Grammar (Optional Enhancement)
-- [ ] Trend pattern (time-series)
-- [ ] Comparison pattern (period-over-period)
-- [ ] Ranking pattern (top/bottom N)
-- [ ] Diagnostic pattern (multi-query root cause analysis)
+### Phase 3: Query Pattern Grammar ✓ COMPLETED
+- [x] Trend pattern (time-series)
+- [x] Comparison pattern (period-over-period)
+- [x] Ranking pattern (top/bottom N)
+- [x] Diagnostic pattern (multi-query root cause analysis)
+- [x] Pattern registry and optimization
 
-### Phase 6: Query Orchestrator (Optional Enhancement)
-- [ ] Multi-query diagnostic workflows
-- [ ] Automated root cause analysis
-- [ ] Recommendation engine
+### Phase 5: Query Orchestrator ✓ COMPLETED
+- [x] Multi-query diagnostic workflows
+- [x] Automated root cause analysis
+- [x] Recommendation engine
+- [x] Trend confirmation and contribution analysis
+
+### Web Chatbot Interface ✓ COMPLETED
+- [x] Flask backend API
+- [x] Modern chat UI with message bubbles
+- [x] Query suggestions and auto-complete
+- [x] Results display (tables, diagnostics, metadata)
+- [x] SQL query visibility toggle
+- [x] Windows batch file for easy startup
 
 ### Future Enhancements
 - [ ] Caching layer (Redis)
@@ -455,10 +474,11 @@ For questions or issues, contact the development team.
 - ✓ Phase 0: Domain migration (BFSI → CPG)
 - ✓ Phase 1: Enhanced data models (SemanticQuery)
 - ✓ Phase 2: AST-based SQL generation
+- ✓ Phase 3: Query pattern grammar (Trend, Comparison, Ranking, Diagnostic, Snapshot)
 - ✓ Phase 4: Dual LLM support (Ollama + Claude)
+- ✓ Phase 5: Query orchestrator (Multi-query diagnostic workflows)
 - ✓ Phase 6: Validation & security (RLS + Audit)
 - ✓ Phase 7: Integration & testing
-- ⏸️ Phase 3: Query patterns (optional enhancement)
-- ⏸️ Phase 5: Query orchestrator (optional enhancement)
+- ✓ **NEW: Web Chatbot Interface** (Flask-based chat UI for local desktop interaction)
 
 **Last Updated:** 2025-02-04
