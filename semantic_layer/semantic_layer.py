@@ -8,6 +8,15 @@ from typing import Dict, List, Optional, Any
 from pathlib import Path
 from .models import Metric, Dimension, QueryIntent, SQLQuery
 
+# New imports for AST-based generation
+try:
+    from .schemas import SemanticQuery
+    from .query_builder import ASTQueryBuilder
+    from .compat import IntentAdapter
+    AST_AVAILABLE = True
+except ImportError:
+    AST_AVAILABLE = False
+
 
 class SemanticLayer:
     """
@@ -54,17 +63,47 @@ class SemanticLayer:
             )
         return dimensions
 
-    def get_metric(self, metric_name: str) -> Optional[Metric]:
-        """Get metric by name or synonym"""
+    def get_metric(self, metric_name: str) -> Optional[Dict]:
+        """Get metric by name or synonym, returns as dict for AST builder"""
         # Direct lookup
         if metric_name in self.metrics:
-            return self.metrics[metric_name]
+            metric = self.metrics[metric_name]
+            return {
+                'name': metric.name,
+                'description': metric.description,
+                'sql': metric.sql,
+                'table': metric.table,
+                'aggregation': metric.aggregation,
+                'format': metric.format
+            }
 
         # Check business terms synonyms
         if metric_name in self.business_terms:
             actual_name = self.business_terms[metric_name]
             if actual_name in self.metrics:
-                return self.metrics[actual_name]
+                metric = self.metrics[actual_name]
+                return {
+                    'name': metric.name,
+                    'description': metric.description,
+                    'sql': metric.sql,
+                    'table': metric.table,
+                    'aggregation': metric.aggregation,
+                    'format': metric.format
+                }
+
+        # Also check config directly for filters
+        config_metrics = self.config.get('metrics', {})
+        if metric_name in config_metrics:
+            cfg = config_metrics[metric_name]
+            return {
+                'name': metric_name,
+                'description': cfg.get('description', ''),
+                'sql': cfg.get('sql', ''),
+                'table': cfg.get('table', ''),
+                'aggregation': cfg.get('aggregation', 'sum'),
+                'format': cfg.get('format', 'number'),
+                'filters': cfg.get('filters', [])
+            }
 
         return None
 
@@ -106,10 +145,70 @@ class SemanticLayer:
                     break
         return matches
 
+    def semantic_query_to_sql(self, semantic_query: 'SemanticQuery') -> SQLQuery:
+        """
+        NEW: AST-based SQL generation from SemanticQuery.
+        Type-safe, injection-proof SQL generation.
+
+        Args:
+            semantic_query: Structured semantic query
+
+        Returns:
+            SQLQuery: Generated SQL with metadata
+        """
+        if not AST_AVAILABLE:
+            raise RuntimeError("AST builder not available. Install required dependencies.")
+
+        try:
+            # Build query AST
+            builder = ASTQueryBuilder(self)
+            query_ast = builder.build_query(semantic_query)
+
+            # Generate SQL from AST
+            sql = query_ast.to_sql(dialect="duckdb")
+
+            # Generate explanation
+            explanation = self._generate_semantic_explanation(semantic_query)
+
+            return SQLQuery(
+                sql=sql,
+                intent=IntentAdapter.downgrade(semantic_query),  # For compatibility
+                explanation=explanation
+            )
+        except Exception as e:
+            raise ValueError(f"Failed to build SQL from semantic query: {e}")
+
+    def _generate_semantic_explanation(self, semantic_query: 'SemanticQuery') -> str:
+        """Generate explanation for SemanticQuery"""
+        parts = []
+
+        # Intent type
+        parts.append(f"Intent: {semantic_query.intent.value}")
+
+        # Metrics
+        metric_names = [semantic_query.metric_request.primary_metric]
+        metric_names.extend(semantic_query.metric_request.secondary_metrics)
+        parts.append(f"Metrics: {', '.join(metric_names)}")
+
+        # Dimensions
+        if semantic_query.dimensionality.group_by:
+            parts.append(f"Dimensions: {', '.join(semantic_query.dimensionality.group_by)}")
+
+        # Time window
+        parts.append(f"Time: {semantic_query.time_context.window}")
+
+        # Filters
+        if semantic_query.filters:
+            parts.append(f"Filters: {len(semantic_query.filters)}")
+
+        return " | ".join(parts)
+
     def intent_to_sql(self, intent: QueryIntent) -> SQLQuery:
         """
-        Convert query intent to SQL
-        This is where semantic layer translates to SQL, NOT the LLM
+        LEGACY: Convert query intent to SQL using string concatenation.
+        Maintained for backward compatibility.
+
+        For new code, use semantic_query_to_sql() with SemanticQuery instead.
         """
         # Build SELECT clause
         select_parts = []

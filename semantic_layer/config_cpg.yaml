@@ -1,0 +1,442 @@
+# Semantic Layer Configuration for CPG/Sales Domain
+# This layer maps business terminology to database schema
+
+database:
+  path: "database/cpg_olap.duckdb"
+  type: "duckdb"
+
+# Define business metrics with SQL logic
+metrics:
+  secondary_sales_value:
+    description: "Net invoiced value to retailers"
+    sql: "SUM(net_value)"
+    table: "fact_secondary_sales"
+    aggregation: "sum"
+    format: "currency"
+    grain: "daily"
+    time_dimension: "invoice_date"
+    filters:
+      - "return_flag = false"
+    allowed_dimensions:
+      - product
+      - geography
+      - customer
+      - channel
+      - date
+
+  secondary_sales_volume:
+    description: "Total units sold to retailers"
+    sql: "SUM(invoice_quantity)"
+    table: "fact_secondary_sales"
+    aggregation: "sum"
+    format: "number"
+    grain: "daily"
+    time_dimension: "invoice_date"
+    filters:
+      - "return_flag = false"
+    allowed_dimensions:
+      - product
+      - geography
+      - customer
+      - channel
+      - date
+
+  gross_sales_value:
+    description: "Gross sales value before discounts"
+    sql: "SUM(invoice_value)"
+    table: "fact_secondary_sales"
+    aggregation: "sum"
+    format: "currency"
+    filters:
+      - "return_flag = false"
+
+  discount_amount:
+    description: "Total discount given"
+    sql: "SUM(discount_amount)"
+    table: "fact_secondary_sales"
+    aggregation: "sum"
+    format: "currency"
+
+  average_discount_percentage:
+    description: "Average discount percentage"
+    sql: "AVG(discount_percentage)"
+    table: "fact_secondary_sales"
+    aggregation: "avg"
+    format: "percentage"
+
+  margin_amount:
+    description: "Total margin earned"
+    sql: "SUM(margin_amount)"
+    table: "fact_secondary_sales"
+    aggregation: "sum"
+    format: "currency"
+    filters:
+      - "return_flag = false"
+
+  average_margin_percentage:
+    description: "Average margin percentage"
+    sql: "AVG(margin_percentage)"
+    table: "fact_secondary_sales"
+    aggregation: "avg"
+    format: "percentage"
+    filters:
+      - "return_flag = false"
+
+  invoice_count:
+    description: "Number of invoices"
+    sql: "COUNT(DISTINCT invoice_number)"
+    table: "fact_secondary_sales"
+    aggregation: "count"
+    format: "number"
+    filters:
+      - "return_flag = false"
+
+  average_invoice_value:
+    description: "Average invoice value"
+    sql: "AVG(net_value)"
+    table: "fact_secondary_sales"
+    aggregation: "avg"
+    format: "currency"
+    filters:
+      - "return_flag = false"
+
+  return_value:
+    description: "Value of returns"
+    sql: "SUM(return_amount)"
+    table: "fact_secondary_sales"
+    aggregation: "sum"
+    format: "currency"
+    filters:
+      - "return_flag = true"
+
+  return_rate:
+    description: "Return rate percentage"
+    sql: "ROUND(100.0 * SUM(CASE WHEN return_flag = true THEN net_value ELSE 0 END) / SUM(net_value), 2)"
+    table: "fact_secondary_sales"
+    aggregation: "custom"
+    format: "percentage"
+
+  active_outlets:
+    description: "Number of outlets with sales"
+    sql: "COUNT(DISTINCT geography_key)"
+    table: "fact_secondary_sales"
+    aggregation: "count"
+    format: "number"
+    filters:
+      - "return_flag = false"
+
+  active_retailers:
+    description: "Number of retailers with sales"
+    sql: "COUNT(DISTINCT customer_key)"
+    table: "fact_secondary_sales"
+    aggregation: "count"
+    format: "number"
+    filters:
+      - "return_flag = false"
+
+  numeric_distribution:
+    description: "Percentage of stores carrying at least 1 SKU"
+    sql: "COUNT(DISTINCT CASE WHEN net_value > 0 THEN geography_key END) / COUNT(DISTINCT geography_key) * 100"
+    table: "fact_distribution"
+    aggregation: "custom"
+    format: "percentage"
+
+  weighted_distribution:
+    description: "Weighted distribution by outlet value"
+    sql: "AVG(weighted_distribution)"
+    table: "fact_distribution"
+    aggregation: "avg"
+    format: "percentage"
+
+  average_selling_price:
+    description: "Average selling price per unit"
+    sql: "SUM(net_value) / NULLIF(SUM(invoice_quantity), 0)"
+    table: "fact_secondary_sales"
+    aggregation: "custom"
+    format: "currency"
+    filters:
+      - "return_flag = false"
+
+# Define dimensions for grouping and filtering
+dimensions:
+  date:
+    table: "dim_date"
+    key: "date_key"
+    attributes:
+      date: "date"
+      year: "year"
+      quarter: "quarter"
+      month: "month"
+      month_name: "month_name"
+      week: "week"
+      day_name: "day_name"
+      is_weekend: "is_weekend"
+      fiscal_year: "fiscal_year"
+      fiscal_quarter: "fiscal_quarter"
+      fiscal_month: "fiscal_month"
+      fiscal_week: "fiscal_week"
+      season: "season"
+      is_promotional_week: "is_promotional_week"
+    hierarchy:
+      - fiscal_year
+      - fiscal_quarter
+      - fiscal_month
+      - fiscal_week
+
+  product:
+    table: "dim_product"
+    key: "product_key"
+    attributes:
+      sku_code: "sku_code"
+      sku_name: "sku_name"
+      brand_name: "brand_name"
+      brand_code: "brand_code"
+      category_name: "category_name"
+      category_code: "category_code"
+      division_name: "division_name"
+      manufacturer_name: "manufacturer_name"
+      pack_size: "pack_size"
+      pack_size_value: "pack_size_value"
+      pack_size_unit: "pack_size_unit"
+      mrp: "mrp"
+      product_status: "product_status"
+      is_focus_brand: "is_focus_brand"
+    hierarchy:
+      - manufacturer_name
+      - division_name
+      - category_name
+      - brand_name
+      - sku_name
+
+  geography:
+    table: "dim_geography"
+    key: "geography_key"
+    attributes:
+      outlet_code: "outlet_code"
+      outlet_name: "outlet_name"
+      town_name: "town_name"
+      district_name: "district_name"
+      state_name: "state_name"
+      zone_name: "zone_name"
+      region_name: "region_name"
+      outlet_classification: "outlet_classification"
+      population_tier: "population_tier"
+      urban_rural: "urban_rural"
+    hierarchy:
+      - zone_name
+      - state_name
+      - district_name
+      - town_name
+      - outlet_name
+
+  customer:
+    table: "dim_customer"
+    key: "customer_key"
+    attributes:
+      distributor_code: "distributor_code"
+      distributor_name: "distributor_name"
+      retailer_code: "retailer_code"
+      retailer_name: "retailer_name"
+      outlet_type: "outlet_type"
+      outlet_subtype: "outlet_subtype"
+      customer_segment: "customer_segment"
+      customer_status: "customer_status"
+      credit_limit: "credit_limit"
+      credit_days: "credit_days"
+    hierarchy:
+      - distributor_name
+      - retailer_name
+
+  channel:
+    table: "dim_channel"
+    key: "channel_key"
+    attributes:
+      channel_code: "channel_code"
+      channel_name: "channel_name"
+      channel_category: "channel_category"
+
+# Define common business terms and their mappings
+business_terms:
+  # Synonyms for metrics
+  sales: "secondary_sales_value"
+  revenue: "secondary_sales_value"
+  value: "secondary_sales_value"
+  volume: "secondary_sales_volume"
+  units: "secondary_sales_volume"
+  quantity: "secondary_sales_volume"
+  invoices: "invoice_count"
+  bills: "invoice_count"
+  margin: "margin_amount"
+  profit: "margin_amount"
+  discount: "discount_amount"
+  returns: "return_value"
+  outlets: "active_outlets"
+  stores: "active_outlets"
+  retailers: "active_retailers"
+  distribution: "numeric_distribution"
+  price: "average_selling_price"
+  asp: "average_selling_price"
+
+  # Synonyms for dimensions
+  time: "date"
+  period: "date"
+  when: "date"
+  brand: "brand_name"
+  sku: "sku_name"
+  product: "sku_name"
+  category: "category_name"
+  state: "state_name"
+  zone: "zone_name"
+  region: "region_name"
+  location: "state_name"
+  where: "state_name"
+  distributor: "distributor_name"
+  outlet: "outlet_name"
+  store: "outlet_name"
+  channel_type: "channel_name"
+
+  # Time periods
+  today: "date = CURRENT_DATE"
+  yesterday: "date = CURRENT_DATE - 1"
+  this_week: "week = WEEK(CURRENT_DATE) AND year = YEAR(CURRENT_DATE)"
+  this_month: "month = MONTH(CURRENT_DATE) AND year = YEAR(CURRENT_DATE)"
+  this_quarter: "quarter = QUARTER(CURRENT_DATE) AND year = YEAR(CURRENT_DATE)"
+  this_year: "year = YEAR(CURRENT_DATE)"
+  last_week: "week = WEEK(CURRENT_DATE - INTERVAL 7 DAY) AND year = YEAR(CURRENT_DATE)"
+  last_month: "month = MONTH(CURRENT_DATE - INTERVAL 1 MONTH) AND year = YEAR(CURRENT_DATE - INTERVAL 1 MONTH)"
+  last_quarter: "quarter = QUARTER(CURRENT_DATE - INTERVAL 3 MONTH) AND year = YEAR(CURRENT_DATE - INTERVAL 3 MONTH)"
+  last_year: "year = YEAR(CURRENT_DATE) - 1"
+  last_4_weeks: "date >= CURRENT_DATE - INTERVAL 4 WEEK"
+  last_6_weeks: "date >= CURRENT_DATE - INTERVAL 6 WEEK"
+  last_12_weeks: "date >= CURRENT_DATE - INTERVAL 12 WEEK"
+  mtd: "month = MONTH(CURRENT_DATE) AND year = YEAR(CURRENT_DATE)"
+  qtd: "quarter = QUARTER(CURRENT_DATE) AND year = YEAR(CURRENT_DATE)"
+  ytd: "year = YEAR(CURRENT_DATE)"
+
+# Define common query patterns
+query_patterns:
+  - pattern: "total|sum|how much"
+    metric_type: "sum"
+
+  - pattern: "average|mean|avg"
+    metric_type: "avg"
+
+  - pattern: "count|number of|how many"
+    metric_type: "count"
+
+  - pattern: "by day|daily|per day"
+    group_by: "date"
+
+  - pattern: "by week|weekly|per week"
+    group_by: "week"
+
+  - pattern: "by month|monthly|per month"
+    group_by: "month_name"
+
+  - pattern: "by quarter|quarterly"
+    group_by: "quarter"
+
+  - pattern: "by year|yearly|annually"
+    group_by: "year"
+
+  - pattern: "by brand|per brand"
+    group_by: "brand_name"
+
+  - pattern: "by category|per category"
+    group_by: "category_name"
+
+  - pattern: "by state|per state"
+    group_by: "state_name"
+
+  - pattern: "by zone|per zone"
+    group_by: "zone_name"
+
+  - pattern: "by channel|per channel"
+    group_by: "channel_name"
+
+  - pattern: "by outlet|per outlet|by store"
+    group_by: "outlet_name"
+
+  - pattern: "by distributor|per distributor"
+    group_by: "distributor_name"
+
+# Define fact table relationships
+fact_tables:
+  fact_secondary_sales:
+    primary_key: "sales_key"
+    dimensions:
+      - "date"
+      - "product"
+      - "geography"
+      - "customer"
+      - "channel"
+    measures:
+      - "invoice_value"
+      - "invoice_quantity"
+      - "net_value"
+      - "discount_amount"
+      - "margin_amount"
+      - "return_amount"
+    time_dimension: "invoice_date"
+    grain: "invoice_line"
+
+  fact_primary_sales:
+    primary_key: "primary_sales_key"
+    dimensions:
+      - "date"
+      - "product"
+      - "customer"
+      - "channel"
+    measures:
+      - "order_value"
+      - "dispatch_value"
+      - "order_quantity"
+
+  fact_inventory:
+    primary_key: "inventory_key"
+    dimensions:
+      - "date"
+      - "product"
+      - "geography"
+      - "customer"
+    measures:
+      - "closing_stock"
+      - "stock_value"
+      - "days_of_supply"
+
+  fact_distribution:
+    primary_key: "distribution_key"
+    dimensions:
+      - "date"
+      - "product"
+      - "geography"
+      - "channel"
+    measures:
+      - "numeric_distribution"
+      - "weighted_distribution"
+      - "outlets_with_stock"
+
+# Time intelligence settings
+time_intelligence:
+  default_window: "last_4_weeks"
+  comparison_windows:
+    wow: "week over week"
+    mom: "month over month"
+    qoq: "quarter over quarter"
+    yoy: "year over year"
+    same_period_last_year: "same period last year"
+  fiscal_year_start_month: 4  # April
+
+# Row-level security rules (for future implementation)
+security:
+  enabled: false
+  user_attribute_mapping:
+    sales_rep:
+      filter_dimension: "territory"
+      attribute: "territories"
+    manager:
+      filter_dimension: "region"
+      attribute: "regions"
+    executive:
+      filter_dimension: null
+      attribute: null
