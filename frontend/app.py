@@ -58,6 +58,30 @@ def process_query():
                 'error': 'Please enter a question'
             })
 
+        # Input validation: Check for out-of-scope questions
+        out_of_scope_keywords = [
+            'table', 'schema', 'column', 'database', 'metadata',
+            'how many table', 'show table', 'describe', 'structure',
+            'what is', 'who are', 'how does', 'explain', 'define',
+            'system', 'llm', 'model', 'backend', 'frontend'
+        ]
+
+        question_lower = question.lower()
+        if any(keyword in question_lower for keyword in out_of_scope_keywords):
+            return jsonify({
+                'success': False,
+                'error': '''This chatbot answers CPG sales analytics questions only.
+
+Out-of-scope question detected. Please try questions like:
+• "Show top 5 brands by sales value"
+• "Weekly sales trend for last 6 weeks"
+• "Why did sales change?"
+• "Top SKUs by volume this month"
+• "Sales by state"
+
+For database metadata, use: python explore_database.py'''
+            })
+
         # 1. Parse intent
         start_time = time.time()
         semantic_query = intent_parser.parse(question)

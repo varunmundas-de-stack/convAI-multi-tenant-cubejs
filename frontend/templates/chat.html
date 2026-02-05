@@ -373,13 +373,22 @@
         <div class="chat-messages" id="chatMessages">
             <div class="message assistant">
                 <div class="message-content">
-                    <p>Hello! I'm your CPG Analytics assistant. I can help you analyze secondary sales data, track trends, and provide insights.</p>
-                    <p style="margin-top: 10px;">Try asking questions like:</p>
+                    <p><strong>Hello! I'm your CPG Analytics assistant.</strong></p>
+                    <p style="margin-top: 10px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                        <strong>⚠️ Scope:</strong> This chatbot answers <strong>CPG sales analytics</strong> questions only.<br>
+                        <em>Cannot answer metadata, schema, or general knowledge questions.</em>
+                    </p>
+                    <p style="margin-top: 10px;"><strong>Try asking questions like:</strong></p>
                     <ul style="margin-top: 8px; padding-left: 20px;">
-                        <li>Show top 5 brands by sales value</li>
-                        <li>Weekly sales trend for last 6 weeks</li>
-                        <li>Why did sales change?</li>
+                        <li><strong>Ranking:</strong> "Show top 5 brands by sales value"</li>
+                        <li><strong>Trend:</strong> "Weekly sales trend for last 6 weeks"</li>
+                        <li><strong>Diagnostic:</strong> "Why did sales change?"</li>
+                        <li><strong>Snapshot:</strong> "Total sales this month"</li>
+                        <li><strong>Filters:</strong> "Sales by state in Tamil Nadu"</li>
                     </ul>
+                    <p style="margin-top: 10px; font-size: 12px; color: #666;">
+                        <strong>💡 Tip:</strong> For database metadata exploration, use the CLI tool: <code>python explore_database.py</code>
+                    </p>
                 </div>
             </div>
         </div>
