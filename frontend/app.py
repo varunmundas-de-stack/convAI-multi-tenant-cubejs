@@ -170,14 +170,65 @@ def process_query():
             })
 
         # Input validation: Check for out-of-scope questions
-        out_of_scope_keywords = [
+
+        # System/technical questions
+        system_keywords = [
             'table', 'schema', 'column', 'database', 'metadata',
             'how many table', 'show table', 'describe', 'structure',
-            'what is', 'who are', 'how does', 'explain', 'define',
-            'system', 'llm', 'model', 'backend', 'frontend'
+            'system', 'llm', 'model', 'backend', 'frontend', 'api', 'code'
         ]
 
-        if any(keyword in question_lower for keyword in out_of_scope_keywords):
+        # General knowledge questions (not business analytics)
+        general_knowledge_keywords = [
+            'who is the president', 'who is the prime minister', 'who won',
+            'what is the capital', 'when was', 'where is',
+            'president of', 'capital of', 'population of',
+            'who invented', 'who discovered', 'who created',
+            'meaning of life', 'how old is', 'birthday',
+            'weather', 'temperature', 'time', 'date today',
+            'movie', 'song', 'book', 'game', 'sport',
+            'recipe', 'cook', 'food recipe'
+        ]
+
+        # Check if question is about non-business topics
+        non_business_topics = [
+            'president', 'politics', 'government', 'election',
+            'country', 'city', 'world', 'planet', 'space',
+            'celebrity', 'actor', 'singer', 'athlete',
+            'history', 'geography', 'science', 'math formula'
+        ]
+
+        # Check for "what is" or "who is" followed by non-business terms
+        if question_lower.startswith(('what is ', 'who is ', 'who are ', 'where is ', 'when was ', 'when is ', 'how does ')):
+            # Check if it contains any business-relevant terms
+            business_terms = ['sales', 'revenue', 'margin', 'volume', 'brand', 'sku', 'distributor',
+                            'retailer', 'channel', 'state', 'zone', 'invoice', 'value', 'trend']
+            has_business_term = any(term in question_lower for term in business_terms)
+
+            if not has_business_term:
+                # Likely a general knowledge question
+                return jsonify({
+                    'success': False,
+                    'error': '''⚠️ <strong>Out of Scope</strong>
+
+This chatbot answers <strong>CPG sales analytics questions only</strong>.
+
+Your question appears to be about general knowledge, not sales data.
+
+💡 <strong>Try typing "give me examples"</strong> to see what I CAN answer!
+
+I can help with:
+• Sales metrics (value, volume, margin)
+• Trends over time
+• Top/bottom performers
+• Comparisons by dimension
+• Root cause analysis ("why" questions)'''
+                })
+
+        if (any(keyword in question_lower for keyword in system_keywords) or
+            any(keyword in question_lower for keyword in general_knowledge_keywords) or
+            (any(topic in question_lower for topic in non_business_topics) and
+             not any(term in question_lower for term in ['sales', 'revenue', 'distributor', 'brand', 'sku']))):
             return jsonify({
                 'success': False,
                 'error': '''⚠️ <strong>Out of Scope</strong>
