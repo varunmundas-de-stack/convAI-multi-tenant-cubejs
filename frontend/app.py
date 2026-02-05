@@ -251,6 +251,56 @@ Quick examples:
 <em>For database metadata, use the CLI tool: python explore_database.py</em>'''
             })
 
+        # Final check: Does question contain ANY business-relevant keywords?
+        # If not, it's likely completely out of scope
+        business_keywords = [
+            # Metrics
+            'sales', 'revenue', 'value', 'volume', 'margin', 'profit', 'discount',
+            'invoice', 'bill', 'amount', 'price', 'cost', 'return',
+            # Dimensions - Product
+            'brand', 'sku', 'product', 'category', 'item', 'pack',
+            # Dimensions - Geography
+            'state', 'zone', 'region', 'district', 'town', 'city', 'area', 'territory',
+            # Dimensions - Customer/Channel
+            'distributor', 'retailer', 'outlet', 'store', 'customer', 'channel',
+            'gt', 'mt', 'trade', 'pharmacy', 'ecom', 'e-com',
+            # Time
+            'week', 'month', 'quarter', 'year', 'daily', 'weekly', 'monthly', 'trend',
+            # Analytics terms
+            'top', 'bottom', 'best', 'worst', 'compare', 'comparison', 'growth',
+            'change', 'increase', 'decrease', 'drop', 'rise', 'performance',
+            'why', 'analyze', 'analysis', 'breakdown', 'distribution',
+            # Common question patterns
+            'show', 'display', 'list', 'get', 'fetch', 'total', 'sum', 'count',
+            'average', 'maximum', 'minimum', 'highest', 'lowest'
+        ]
+
+        has_any_business_keyword = any(keyword in question_lower for keyword in business_keywords)
+
+        if not has_any_business_keyword:
+            return jsonify({
+                'success': False,
+                'error': '''⚠️ <strong>Question Not Recognized</strong>
+
+I couldn't find any business analytics terms in your question.
+
+This chatbot is specialized for <strong>CPG sales analytics only</strong>.
+
+💡 <strong>Try typing "give me examples"</strong> to see the full list of questions I understand!
+
+<strong>Valid questions must include terms like:</strong>
+• <strong>Metrics:</strong> sales, revenue, volume, margin, invoices
+• <strong>Products:</strong> brand, SKU, category, product
+• <strong>Geography:</strong> state, zone, region, district
+• <strong>Customers:</strong> distributor, retailer, outlet, channel
+• <strong>Analysis:</strong> top, trend, compare, why, breakdown
+
+<strong>Examples:</strong>
+• "Show top 5 brands by sales"
+• "Compare sales by channel"
+• "Weekly trend for last 6 weeks"'''
+            })
+
         # 1. Parse intent
         start_time = time.time()
         try:
