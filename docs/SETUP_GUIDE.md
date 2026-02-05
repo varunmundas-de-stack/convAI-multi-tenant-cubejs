@@ -47,7 +47,61 @@ Database created successfully!
 
 **Result:** `cpg_olap.duckdb` file created with 1,000 sales records
 
-## 4. Run Demo
+## 4. Sync Data to ChromaDB (Vector Store)
+
+**Purpose:** Enable semantic search and AI-enhanced query modes.
+
+```bash
+python vector_store/sync_duckdb_to_chroma.py
+```
+
+**Expected output:**
+```
+============================================================
+DuckDB to ChromaDB Sync Script
+============================================================
+
+Starting synchronization...
+
+Processing dim_date:   100%|████████| 90/90
+Processing dim_product: 100%|████████| 50/50
+Processing dim_geography: 100%|████████| 200/200
+Processing dim_customer: 100%|████████| 120/120
+Processing fact_secondary_sales: 100%|████████| 1000/1000
+Processing dim_channel: 100%|████████| 5/5
+
+============================================================
+Sync Results:
+============================================================
+
+✓ dim_date: 90 rows synced
+✓ dim_product: 50 rows synced
+✓ dim_geography: 200 rows synced
+✓ dim_customer: 120 rows synced
+✓ fact_secondary_sales: 1000 rows synced
+✓ dim_channel: 5 rows synced
+
+============================================================
+ChromaDB Summary:
+============================================================
+Total collections: 6
+  - duckdb_dim_date: 90 documents
+  - duckdb_dim_product: 50 documents
+  - duckdb_dim_geography: 200 documents
+  - duckdb_dim_customer: 120 documents
+  - duckdb_fact_secondary_sales: 1000 documents
+  - duckdb_dim_channel: 5 documents
+
+============================================================
+Sync Complete!
+============================================================
+```
+
+**Result:** ChromaDB initialized with 1,465 embedded documents in `database/chroma/`
+
+**Note:** This step takes 2-5 minutes on first run as it downloads the embedding model (~80MB).
+
+## 5. Run Demo
 
 ```bash
 cd ..  # back to Conv-AI-Project#1
@@ -335,13 +389,41 @@ Try these in the chatbot:
 ### Features
 
 - **Natural Language Input:** Ask questions in plain English
+- **3 Query Modes:** Standard, AI-Enhanced, ChromaDB Direct (switchable via UI)
 - **Help System:** Type "give me examples" for 35+ categorized sample questions
 - **Rich Results:** Tables, trends, and diagnostic insights
 - **Query Suggestions:** Click quick suggestions to get started
-- **SQL Visibility:** View the generated SQL query
+- **SQL Visibility:** View the generated SQL query (Standard/AI-Enhanced modes)
 - **Metadata Display:** See query intent, confidence, and execution time
 - **Diagnostic Workflows:** Automatic multi-query analysis for "why" questions
 - **Enhanced Intent Parsing:** Better detection of dimensions (channel, distributor, SKU, etc.)
+- **Semantic Search:** ChromaDB-powered similarity matching
+
+### Query Modes
+
+The chatbot offers **3 different query modes** - select using the mode toggle at the bottom:
+
+**1. 📊 Standard Mode** (Default)
+- Traditional keyword-based matching
+- Uses semantic layer configuration
+- Fast and deterministic
+- Best for: Precise queries with known metrics/dimensions
+
+**2. 🤖 AI-Enhanced Mode**
+- ChromaDB finds similar past queries
+- Uses examples to improve intent understanding
+- Still executes on DuckDB (structured query)
+- Shows similar queries found
+- Best for: Ambiguous questions, natural phrasing
+
+**3. 🔍 ChromaDB Direct Mode**
+- Pure semantic search on embedded data
+- Searches across all 1,465 embedded documents
+- Returns semantically similar results
+- No SQL generation
+- Best for: Exploratory search, finding patterns, typo tolerance
+
+**Try the same question in all 3 modes to compare results!**
 
 ### Chatbot Architecture
 
