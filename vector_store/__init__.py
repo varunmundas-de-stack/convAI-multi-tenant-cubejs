@@ -1,8 +1,6 @@
 """
 Vector Store Module for Conv-AI Project
-Provides ChromaDB integration for semantic search and vector storage.
+This version uses DuckDB only for relational database operations.
 """
 
-from .chromadb_client import ChromaDBClient, get_chroma_client
-
-__all__ = ['ChromaDBClient', 'get_chroma_client']
+__all__ = []
