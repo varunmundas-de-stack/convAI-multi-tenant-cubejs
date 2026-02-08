@@ -1,0 +1,246 @@
+"""
+Create multi-schema DuckDB database for RBAC testing
+Each client gets isolated schema with sample data
+"""
+import duckdb
+from pathlib import Path
+import random
+from datetime import datetime, timedelta
+
+DB_PATH = Path(__file__).parent / "cpg_multi_tenant.duckdb"
+
+
+def create_multi_schema_db():
+    """Create multi-tenant database with isolated schemas"""
+    conn = duckdb.connect(str(DB_PATH))
+
+    # Create schemas for each client
+    schemas = ['client_nestle', 'client_unilever', 'client_itc']
+
+    for schema in schemas:
+        print(f"\n📦 Creating schema: {schema}")
+        conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
+
+        # Create dimension tables
+        create_dimensions(conn, schema)
+
+        # Create fact table
+        create_fact_table(conn, schema)
+
+        # Insert sample data
+        insert_sample_data(conn, schema)
+
+        print(f"✅ Schema {schema} created with sample data")
+
+    conn.close()
+    print(f"\n✅ Multi-tenant database created at: {DB_PATH}")
+    print(f"✅ File size: {DB_PATH.stat().st_size / 1024:.2f} KB")
+
+
+def create_dimensions(conn, schema):
+    """Create dimension tables"""
+
+    # dim_product
+    conn.execute(f"""
+        CREATE TABLE IF NOT EXISTS {schema}.dim_product (
+            product_key INTEGER PRIMARY KEY,
+            sku_code VARCHAR,
+            sku_name VARCHAR,
+            brand_name VARCHAR,
+            category_name VARCHAR,
+            pack_size VARCHAR
+        )
+    """)
+
+    # dim_geography
+    conn.execute(f"""
+        CREATE TABLE IF NOT EXISTS {schema}.dim_geography (
+            geography_key INTEGER PRIMARY KEY,
+            state_name VARCHAR,
+            district_name VARCHAR,
+            town_name VARCHAR
+        )
+    """)
+
+    # dim_customer
+    conn.execute(f"""
+        CREATE TABLE IF NOT EXISTS {schema}.dim_customer (
+            customer_key INTEGER PRIMARY KEY,
+            distributor_name VARCHAR,
+            retailer_name VARCHAR,
+            outlet_type VARCHAR
+        )
+    """)
+
+    # dim_channel
+    conn.execute(f"""
+        CREATE TABLE IF NOT EXISTS {schema}.dim_channel (
+            channel_key INTEGER PRIMARY KEY,
+            channel_name VARCHAR
+        )
+    """)
+
+    # dim_date
+    conn.execute(f"""
+        CREATE TABLE IF NOT EXISTS {schema}.dim_date (
+            date_key INTEGER PRIMARY KEY,
+            date DATE,
+            year INTEGER,
+            quarter INTEGER,
+            month INTEGER,
+            month_name VARCHAR,
+            week INTEGER
+        )
+    """)
+
+
+def create_fact_table(conn, schema):
+    """Create fact table"""
+    conn.execute(f"""
+        CREATE TABLE IF NOT EXISTS {schema}.fact_secondary_sales (
+            invoice_key INTEGER PRIMARY KEY,
+            invoice_date DATE,
+            product_key INTEGER,
+            geography_key INTEGER,
+            customer_key INTEGER,
+            channel_key INTEGER,
+            date_key INTEGER,
+            invoice_number VARCHAR,
+            invoice_value DECIMAL(12,2),
+            discount_amount DECIMAL(12,2),
+            discount_percentage DECIMAL(5,2),
+            net_value DECIMAL(12,2),
+            invoice_quantity INTEGER,
+            margin_amount DECIMAL(12,2),
+            margin_percentage DECIMAL(5,2),
+            return_flag BOOLEAN DEFAULT FALSE
+        )
+    """)
+
+
+def insert_sample_data(conn, schema):
+    """Insert sample data"""
+    client_suffix = schema.split('_')[1]
+
+    # Insert products (10 products per client)
+    brands = ['Brand-A', 'Brand-B', 'Brand-C', 'Brand-D', 'Brand-E']
+    categories = ['Beverages', 'Snacks', 'Personal Care']
+
+    for i in range(10):
+        brand = brands[i % len(brands)]
+        category = categories[i % len(categories)]
+        conn.execute(f"""
+            INSERT INTO {schema}.dim_product VALUES (
+                {i + 1},
+                'SKU{i+1:03d}-{client_suffix}',
+                'Product-{i+1}-{client_suffix}',
+                '{brand}-{client_suffix}',
+                '{category}',
+                '100g'
+            )
+        """)
+
+    # Insert geography (5 states)
+    states = [
+        ('Tamil Nadu', 'Chennai', 'T Nagar'),
+        ('Karnataka', 'Bangalore', 'Koramangala'),
+        ('Maharashtra', 'Mumbai', 'Andheri'),
+        ('Delhi', 'New Delhi', 'Connaught Place'),
+        ('Gujarat', 'Ahmedabad', 'Navrangpura')
+    ]
+
+    for i, (state, district, town) in enumerate(states):
+        conn.execute(f"""
+            INSERT INTO {schema}.dim_geography VALUES (
+                {i + 1},
+                '{state}',
+                '{district}',
+                '{town}'
+            )
+        """)
+
+    # Insert customers (5 customers)
+    outlet_types = ['GT', 'MT', 'E-Com']
+    for i in range(5):
+        outlet = outlet_types[i % len(outlet_types)]
+        conn.execute(f"""
+            INSERT INTO {schema}.dim_customer VALUES (
+                {i + 1},
+                'Distributor-{i+1}-{client_suffix}',
+                'Retailer-{i+1}-{client_suffix}',
+                '{outlet}'
+            )
+        """)
+
+    # Insert channels
+    channels = ['GT', 'MT', 'E-Com', 'IWS', 'Pharma']
+    for i, channel in enumerate(channels):
+        conn.execute(f"""
+            INSERT INTO {schema}.dim_channel VALUES (
+                {i + 1},
+                '{channel}'
+            )
+        """)
+
+    # Insert dates (30 days)
+    start_date = datetime(2024, 1, 1)
+    for i in range(30):
+        date = start_date + timedelta(days=i)
+        conn.execute(f"""
+            INSERT INTO {schema}.dim_date VALUES (
+                {i + 1},
+                '{date.strftime('%Y-%m-%d')}',
+                {date.year},
+                {(date.month - 1) // 3 + 1},
+                {date.month},
+                '{date.strftime('%B')}',
+                {date.isocalendar()[1]}
+            )
+        """)
+
+    # Insert sales transactions (50 transactions)
+    random.seed(hash(schema))  # Different data per schema
+
+    for i in range(50):
+        product_key = random.randint(1, 10)
+        geo_key = random.randint(1, 5)
+        customer_key = random.randint(1, 5)
+        channel_key = random.randint(1, 5)
+        date_key = random.randint(1, 30)
+
+        invoice_value = random.randint(5000, 50000)
+        discount_pct = random.uniform(5, 15)
+        discount_amt = invoice_value * discount_pct / 100
+        net_value = invoice_value - discount_amt
+        quantity = random.randint(10, 100)
+        margin_pct = random.uniform(10, 25)
+        margin_amt = net_value * margin_pct / 100
+
+        date = start_date + timedelta(days=date_key - 1)
+
+        conn.execute(f"""
+            INSERT INTO {schema}.fact_secondary_sales VALUES (
+                {i + 1},
+                '{date.strftime('%Y-%m-%d')}',
+                {product_key},
+                {geo_key},
+                {customer_key},
+                {channel_key},
+                {date_key},
+                'INV{i+1:04d}-{client_suffix}',
+                {invoice_value},
+                {discount_amt:.2f},
+                {discount_pct:.2f},
+                {net_value:.2f},
+                {quantity},
+                {margin_amt:.2f},
+                {margin_pct:.2f},
+                FALSE
+            )
+        """)
+
+
+if __name__ == "__main__":
+    print("Creating multi-schema DuckDB database...")
+    create_multi_schema_db()
+    print("\n✅ Setup complete! Each client has isolated data.")

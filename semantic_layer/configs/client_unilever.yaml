@@ -1,0 +1,163 @@
+# Client Configuration: Unilever India
+# This config is loaded per client for multi-tenant support
+
+client:
+  id: "unilever"
+  name: "Unilever India"
+  schema: "client_unilever"
+
+database:
+  path: "database/cpg_multi_tenant.duckdb"
+  type: "duckdb"
+  schema: "client_unilever"
+
+# Define business metrics
+metrics:
+  secondary_sales_value:
+    description: "Net invoiced value to retailers"
+    sql: "SUM(net_value)"
+    table: "fact_secondary_sales"
+    aggregation: "sum"
+    format: "currency"
+    allowed_dimensions:
+      - product
+      - geography
+      - customer
+      - channel
+      - date
+
+  secondary_sales_volume:
+    description: "Total units sold to retailers"
+    sql: "SUM(invoice_quantity)"
+    table: "fact_secondary_sales"
+    aggregation: "sum"
+    format: "number"
+
+  gross_sales_value:
+    description: "Gross sales value before discounts"
+    sql: "SUM(invoice_value)"
+    table: "fact_secondary_sales"
+    aggregation: "sum"
+    format: "currency"
+
+  discount_amount:
+    description: "Total discount given"
+    sql: "SUM(discount_amount)"
+    table: "fact_secondary_sales"
+    aggregation: "sum"
+    format: "currency"
+
+  margin_amount:
+    description: "Total margin earned"
+    sql: "SUM(margin_amount)"
+    table: "fact_secondary_sales"
+    aggregation: "sum"
+    format: "currency"
+
+  invoice_count:
+    description: "Number of invoices"
+    sql: "COUNT(DISTINCT invoice_number)"
+    table: "fact_secondary_sales"
+    aggregation: "count"
+    format: "number"
+
+# Define dimensions
+dimensions:
+  product:
+    description: "Product hierarchy"
+    table: "dim_product"
+    levels:
+      - name: "brand_name"
+        column: "brand_name"
+        description: "Brand name"
+      - name: "category_name"
+        column: "category_name"
+        description: "Product category"
+      - name: "sku_name"
+        column: "sku_name"
+        description: "SKU name"
+
+  geography:
+    description: "Geographic hierarchy"
+    table: "dim_geography"
+    levels:
+      - name: "state_name"
+        column: "state_name"
+        description: "State"
+      - name: "district_name"
+        column: "district_name"
+        description: "District"
+      - name: "town_name"
+        column: "town_name"
+        description: "Town"
+
+  customer:
+    description: "Customer hierarchy"
+    table: "dim_customer"
+    levels:
+      - name: "distributor_name"
+        column: "distributor_name"
+        description: "Distributor"
+      - name: "retailer_name"
+        column: "retailer_name"
+        description: "Retailer"
+      - name: "outlet_type"
+        column: "outlet_type"
+        description: "Outlet type"
+
+  channel:
+    description: "Sales channel"
+    table: "dim_channel"
+    levels:
+      - name: "channel_name"
+        column: "channel_name"
+        description: "Channel"
+
+  date:
+    description: "Time dimension"
+    table: "dim_date"
+    levels:
+      - name: "year"
+        column: "year"
+        description: "Year"
+      - name: "quarter"
+        column: "quarter"
+        description: "Quarter"
+      - name: "month"
+        column: "month"
+        description: "Month"
+      - name: "week"
+        column: "week"
+        description: "Week"
+
+# Business terms mapping (synonyms)
+business_terms:
+  sales: "secondary_sales_value"
+  revenue: "secondary_sales_value"
+  value: "secondary_sales_value"
+  volume: "secondary_sales_volume"
+  units: "secondary_sales_volume"
+  qty: "secondary_sales_volume"
+  margin: "margin_amount"
+  profit: "margin_amount"
+  discount: "discount_amount"
+  invoices: "invoice_count"
+  bills: "invoice_count"
+
+# Time windows
+time_windows:
+  this_month:
+    grain: "month"
+    window: "current"
+  last_month:
+    grain: "month"
+    window: "previous"
+  this_quarter:
+    grain: "quarter"
+    window: "current"
+  last_4_weeks:
+    grain: "week"
+    window: -4
+  last_6_weeks:
+    grain: "week"
+    window: -6
