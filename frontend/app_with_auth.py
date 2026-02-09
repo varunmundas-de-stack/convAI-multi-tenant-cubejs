@@ -1,16 +1,3 @@
-# Create Authenticated Flask App
-
-## Instructions
-
-Create this file: `frontend/app_with_auth.py`
-
-Copy the entire code below into that file.
-
----
-
-## Complete Code for `frontend/app_with_auth.py`
-
-```python
 """
 Flask Web Application with RBAC for CPG Conversational AI Chatbot
 Implements user authentication and client-based schema access control
@@ -39,10 +26,17 @@ app = Flask(__name__)
 # IMPORTANT: Change this in production! Use environment variable
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
 
+# Session configuration - expire when browser closes
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
+app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+
 # Initialize Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'  # Redirect to login page if not authenticated
+login_manager.session_protection = "strong"  # Prevent session hijacking
 
 # Initialize auth manager
 auth_manager = AuthManager("database/users.db")
@@ -100,7 +94,7 @@ def login():
         user = auth_manager.authenticate(username, password)
 
         if user:
-            login_user(user)
+            login_user(user, remember=False)  # Don't remember across browser sessions
             return jsonify({
                 'success': True,
                 'message': 'Login successful',
@@ -132,6 +126,24 @@ def index():
     return render_template('chat.html',
                          user=current_user,
                          client_name=client_config['client_name'])
+
+
+@app.route('/api/suggestions', methods=['GET'])
+@login_required
+def get_suggestions():
+    """Get query suggestions for the user"""
+    # More varied and comprehensive suggestions
+    suggestions = [
+        "Show top 5 brands by sales",
+        "Weekly sales trend for last 6 weeks",
+        "Top 10 SKUs by volume this month",
+        "Why did sales change?",
+        "Total sales this month",
+        "Compare sales by channel",
+        "Top distributors by sales value",
+        "Sales by state this month"
+    ]
+    return jsonify({'suggestions': suggestions})
 
 
 @app.route('/api/query', methods=['POST'])
@@ -209,6 +221,117 @@ def process_query():
                     'query_id': f"HELP{int(time.time())}",
                     'intent': 'help',
                 }
+            })
+
+        # Check for out-of-scope questions
+        # 1. Metadata/schema questions
+        metadata_keywords = [
+            'table', 'column', 'schema', 'database', 'metadata',
+            'what tables', 'what columns', 'show tables', 'describe table',
+            'table structure', 'database structure', 'list tables',
+            'what data', 'what fields', 'available fields'
+        ]
+
+        if any(keyword in question_lower for keyword in metadata_keywords):
+            client_config = auth_manager.get_client_config(current_user.client_id)
+            html_response = f"""
+            <div style="padding: 15px; background: #ffebee; border-left: 4px solid #f44336; border-radius: 4px;">
+                <h3 style="color: #d32f2f; margin-bottom: 10px;">❌ Out of Scope Question</h3>
+                <p><strong>This chatbot is for analytics queries only, not database metadata exploration.</strong></p>
+                <p style="margin-top: 10px;">You asked about database structure or metadata. This information is not available through the chatbot interface.</p>
+                <p style="margin-top: 10px; padding: 10px; background: white; border-radius: 4px;">
+                    <strong>What you CAN ask:</strong><br>
+                    • "Show top 5 brands by sales"<br>
+                    • "Weekly sales trend"<br>
+                    • "Why did sales change?"<br>
+                    • "Total sales this month"
+                </p>
+                <p style="margin-top: 10px; font-size: 12px; color: #666;">
+                    <em>💡 For metadata exploration, use the CLI tool: <code>python explore_database.py</code></em>
+                </p>
+            </div>
+            """
+            return jsonify({
+                'success': False,
+                'response': html_response,
+                'metadata': {'intent': 'out_of_scope_metadata'}
+            })
+
+        # 2. General knowledge questions
+        general_keywords = [
+            'who is', 'what is', 'when was', 'where is', 'how to',
+            'weather', 'news', 'stock market', 'sports', 'politics',
+            'calculate', 'math', 'geography', 'history', 'science'
+        ]
+
+        if any(keyword in question_lower for keyword in general_keywords):
+            # Exclude legitimate analytics questions
+            analytics_exceptions = ['what are', 'how much', 'how many']
+            if not any(exc in question_lower for exc in analytics_exceptions):
+                html_response = f"""
+                <div style="padding: 15px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                    <h3 style="color: #856404; margin-bottom: 10px;">⚠️ Out of Scope Question</h3>
+                    <p><strong>This chatbot is specialized for CPG sales analytics only.</strong></p>
+                    <p style="margin-top: 10px;">Your question appears to be about general knowledge or non-analytics topics.</p>
+                    <p style="margin-top: 10px; padding: 10px; background: white; border-radius: 4px;">
+                        <strong>I can help you with:</strong><br>
+                        • Sales performance analysis<br>
+                        • Brand and product insights<br>
+                        • Distribution channel metrics<br>
+                        • Time-based trends and diagnostics
+                    </p>
+                    <p style="margin-top: 10px; font-size: 13px;">
+                        <strong>Try asking:</strong> "Show top brands by sales this month"
+                    </p>
+                </div>
+                """
+                return jsonify({
+                    'success': False,
+                    'response': html_response,
+                    'metadata': {'intent': 'out_of_scope_general'}
+                })
+
+        # 3. Check for cross-client queries (mentions of other companies)
+        all_clients = {
+            'nestle': ['nestle', 'nestlé'],
+            'unilever': ['unilever', 'hindustan unilever', 'hul'],
+            'itc': ['itc', 'itc limited']
+        }
+
+        # Check if question mentions other clients
+        mentioned_clients = []
+        for client_id, aliases in all_clients.items():
+            if client_id != current_user.client_id:
+                if any(alias in question_lower for alias in aliases):
+                    client_config = auth_manager.get_client_config(client_id)
+                    if client_config:
+                        mentioned_clients.append(client_config['client_name'])
+
+        if mentioned_clients:
+            current_client = auth_manager.get_client_config(current_user.client_id)
+            html_response = f"""
+            <div style="padding: 15px; background: #ffebee; border-left: 4px solid #f44336; border-radius: 4px;">
+                <h3 style="color: #d32f2f; margin-bottom: 10px;">🚫 Permission Denied</h3>
+                <p><strong>You do not have access to data from: {', '.join(mentioned_clients)}</strong></p>
+                <p style="margin-top: 10px;">Your account (<strong>{current_user.username}</strong>) is authorized to access <strong>{current_client['client_name']}</strong> data only.</p>
+                <p style="margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 4px;">
+                    <strong>⚠️ Data Isolation:</strong><br>
+                    For security and privacy reasons, each client's data is completely isolated.
+                    You can only query data for your assigned organization.
+                </p>
+                <p style="margin-top: 10px; padding: 10px; background: white; border-radius: 4px;">
+                    <strong>✅ You CAN ask about:</strong><br>
+                    • "{current_client['client_name']} top brands by sales"<br>
+                    • "Weekly sales trend for my products"<br>
+                    • "Why did our sales change?"<br>
+                    • "Total sales this month"
+                </p>
+            </div>
+            """
+            return jsonify({
+                'success': False,
+                'response': html_response,
+                'metadata': {'intent': 'permission_denied'}
             })
 
         # Parse intent
@@ -421,26 +544,3 @@ if __name__ == '__main__':
     print("="*60)
 
     app.run(debug=True, host='0.0.0.0', port=5000)
-```
-
----
-
-## Save Instructions
-
-1. **Open a new file:**
-   ```
-   frontend/app_with_auth.py
-   ```
-
-2. **Copy the entire code above**
-
-3. **Save the file**
-
-4. **Done!**
-
----
-
-## File Size
-
-**Expected size:** ~15 KB (~400 lines of code)
-

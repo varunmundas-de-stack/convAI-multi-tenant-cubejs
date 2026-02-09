@@ -18,7 +18,7 @@ def create_multi_schema_db():
     schemas = ['client_nestle', 'client_unilever', 'client_itc']
 
     for schema in schemas:
-        print(f"\n📦 Creating schema: {schema}")
+        print(f"\n[*] Creating schema: {schema}")
         conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
 
         # Create dimension tables
@@ -30,11 +30,11 @@ def create_multi_schema_db():
         # Insert sample data
         insert_sample_data(conn, schema)
 
-        print(f"✅ Schema {schema} created with sample data")
+        print(f"[OK] Schema {schema} created with sample data")
 
     conn.close()
-    print(f"\n✅ Multi-tenant database created at: {DB_PATH}")
-    print(f"✅ File size: {DB_PATH.stat().st_size / 1024:.2f} KB")
+    print(f"\n[OK] Multi-tenant database created at: {DB_PATH}")
+    print(f"[OK] File size: {DB_PATH.stat().st_size / 1024:.2f} KB")
 
 
 def create_dimensions(conn, schema):
@@ -243,4 +243,4 @@ def insert_sample_data(conn, schema):
 if __name__ == "__main__":
     print("Creating multi-schema DuckDB database...")
     create_multi_schema_db()
-    print("\n✅ Setup complete! Each client has isolated data.")
+    print("\n[OK] Setup complete! Each client has isolated data.")

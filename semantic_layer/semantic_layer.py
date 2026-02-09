@@ -27,10 +27,16 @@ class SemanticLayer:
     This is the key component that avoids direct LLM->SQL generation
     """
 
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str, client_id: Optional[str] = None):
         """Initialize semantic layer with configuration"""
         self.config_path = Path(config_path)
         self.config = self._load_config()
+        self.client_id = client_id
+
+        # Extract database schema from config
+        database_config = self.config.get('database', {})
+        self.db_schema = database_config.get('schema', None)
+
         self.metrics = self._parse_metrics()
         self.dimensions = self._parse_dimensions()
         self.business_terms = self.config.get('business_terms', {})
@@ -46,6 +52,21 @@ class SemanticLayer:
         with open(self.config_path, 'r') as f:
             return yaml.safe_load(f)
 
+    def _qualify_table_name(self, table_name: str) -> str:
+        """Qualify table name with schema if needed"""
+        if not table_name:
+            return table_name
+
+        # If table already has schema prefix, return as is
+        if '.' in table_name:
+            return table_name
+
+        # If we have a schema configured, prepend it
+        if self.db_schema:
+            return f"{self.db_schema}.{table_name}"
+
+        return table_name
+
     def _parse_metrics(self) -> Dict[str, Metric]:
         """Parse metrics from configuration"""
         metrics = {}
@@ -54,7 +75,7 @@ class SemanticLayer:
                 name=name,
                 description=config['description'],
                 sql=config['sql'],
-                table=config['table'],
+                table=self._qualify_table_name(config['table']),
                 aggregation=config['aggregation'],
                 format=config.get('format', 'number')
             )
@@ -64,11 +85,28 @@ class SemanticLayer:
         """Parse dimensions from configuration"""
         dimensions = {}
         for name, config in self.config.get('dimensions', {}).items():
+            # Handle both old format (key + attributes) and new format (levels)
+            if 'levels' in config:
+                # New format: convert levels to attributes
+                attributes = {}
+                for level in config['levels']:
+                    attributes[level['name']] = level['column']
+
+                # Infer key from table name or use first level
+                key_name = f"{name}_key"
+                if not attributes:
+                    # Fallback if no levels
+                    key_name = "id"
+            else:
+                # Old format: use key and attributes directly
+                key_name = config.get('key', f"{name}_key")
+                attributes = config.get('attributes', {})
+
             dimensions[name] = Dimension(
                 name=name,
-                table=config['table'],
-                key=config['key'],
-                attributes=config['attributes']
+                table=self._qualify_table_name(config['table']),
+                key=key_name,
+                attributes=attributes
             )
         return dimensions
 
@@ -81,7 +119,7 @@ class SemanticLayer:
                 'name': metric.name,
                 'description': metric.description,
                 'sql': metric.sql,
-                'table': metric.table,
+                'table': self._qualify_table_name(metric.table),
                 'aggregation': metric.aggregation,
                 'format': metric.format
             }
@@ -95,7 +133,7 @@ class SemanticLayer:
                     'name': metric.name,
                     'description': metric.description,
                     'sql': metric.sql,
-                    'table': metric.table,
+                    'table': self._qualify_table_name(metric.table),
                     'aggregation': metric.aggregation,
                     'format': metric.format
                 }
@@ -108,7 +146,7 @@ class SemanticLayer:
                 'name': metric_name,
                 'description': cfg.get('description', ''),
                 'sql': cfg.get('sql', ''),
-                'table': cfg.get('table', ''),
+                'table': self._qualify_table_name(cfg.get('table', '')),
                 'aggregation': cfg.get('aggregation', 'sum'),
                 'format': cfg.get('format', 'number'),
                 'filters': cfg.get('filters', [])

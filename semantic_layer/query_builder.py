@@ -185,13 +185,23 @@ class ASTQueryBuilder:
         joined_tables = set()
 
         for dim in dimensions_used:
-            table = dimension_tables.get(dim)
-            if table and table not in joined_tables:
-                # Create join
-                join = self._create_dimension_join(table)
+            base_table = dimension_tables.get(dim)
+            if base_table and base_table not in joined_tables:
+                # Get the qualified table name from semantic layer
+                # by finding which dimension has this table
+                qualified_table = base_table  # fallback to base name
+                for dim_name, dimension in self.semantic_layer.dimensions.items():
+                    # Check if this dimension's table matches (extract base name)
+                    dim_base_table = dimension.table.split('.')[-1] if '.' in dimension.table else dimension.table
+                    if dim_base_table == base_table:
+                        qualified_table = dimension.table  # Use fully qualified name
+                        break
+
+                # Create join with qualified table name
+                join = self._create_dimension_join(qualified_table)
                 if join:
                     joins.append(join)
-                    joined_tables.add(table)
+                    joined_tables.add(base_table)  # Track by base name to avoid duplicates
 
         return joins
 
@@ -235,13 +245,16 @@ class ASTQueryBuilder:
             'dim_channel': 'ch'
         }
 
-        condition = join_conditions.get(table)
-        alias = table_aliases.get(table)
+        # Extract base table name (handle schema-qualified names like client_nestle.dim_product)
+        base_table = table.split('.')[-1] if '.' in table else table
+
+        condition = join_conditions.get(base_table)
+        alias = table_aliases.get(base_table)
 
         if condition and alias:
             return JoinClause(
                 join_type="LEFT",
-                table=table,
+                table=table,  # Use full qualified table name
                 alias=alias,
                 on_condition=condition
             )
