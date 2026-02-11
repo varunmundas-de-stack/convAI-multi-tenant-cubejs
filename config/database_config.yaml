@@ -1,0 +1,80 @@
+# Multi-Tenant Database Configuration
+# Each tenant uses a different SQL database engine
+
+tenants:
+  tenant_itc:
+    name: "ITC"
+    database_type: "duckdb"
+    connection:
+      path: "database/itc_olap.duckdb"
+      schema: "main"
+      read_only: false
+    description: "ITC tenant using DuckDB for local analytics"
+
+  tenant_nestle:
+    name: "Nestlé"
+    database_type: "postgresql"
+    connection:
+      host: "${POSTGRES_HOST:localhost}"
+      port: "${POSTGRES_PORT:5432}"
+      database: "nestle_analytics"
+      user: "${POSTGRES_USER:postgres}"
+      password: "${POSTGRES_PASSWORD}"
+      schema: "public"
+      sslmode: "prefer"
+    description: "Nestlé tenant using PostgreSQL for enterprise analytics"
+
+  tenant_unilever:
+    name: "Unilever"
+    database_type: "mssql"
+    connection:
+      server: "${MSSQL_SERVER:localhost}"
+      port: "${MSSQL_PORT:1433}"
+      database: "unilever_analytics"
+      user: "${MSSQL_USER:sa}"
+      password: "${MSSQL_PASSWORD}"
+      driver: "ODBC Driver 17 for SQL Server"
+      encrypt: true
+      trust_server_certificate: true
+    description: "Unilever tenant using MS SQL Server for cloud-scale analytics"
+
+# Feature flags per tenant
+features:
+  tenant_itc:
+    push_notifications: true
+    daily_digest: true
+    advanced_analytics: true
+    llm_provider: "openai"
+
+  tenant_nestle:
+    push_notifications: true
+    daily_digest: true
+    advanced_analytics: true
+    llm_provider: "azure_openai"
+
+  tenant_unilever:
+    push_notifications: true
+    daily_digest: true
+    advanced_analytics: true
+    llm_provider: "anthropic"
+
+# Database-specific settings
+database_settings:
+  duckdb:
+    threads: 4
+    memory_limit: "4GB"
+    extensions:
+      - httpfs
+      - parquet
+
+  postgresql:
+    pool_size: 10
+    max_overflow: 20
+    pool_timeout: 30
+    pool_recycle: 3600
+
+  mssql:
+    pool_size: 10
+    max_overflow: 20
+    pool_timeout: 30
+    fast_executemany: true
