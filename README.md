@@ -30,7 +30,7 @@ A production-ready CPG (Consumer Packaged Goods) analytics chatbot with Role-Bas
 
 ```bash
 # Clone repository
-git clone https://github.com/varunmundas-de-stack/Conve-AI-Project-RelDB-Only.git
+git clone https://github.com/varunmundas-de-stack/convAI-multi-tenant-cubejs.git
 cd Conve-AI-Project-RelDB-Only
 
 # Install dependencies

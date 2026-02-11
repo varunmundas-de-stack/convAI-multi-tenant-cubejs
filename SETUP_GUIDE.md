@@ -75,7 +75,7 @@ mkdir projects
 cd projects
 
 # 2. Clone repository
-git clone https://github.com/varunmundas-de-stack/Conve-AI-Project-RelDB-Only.git
+git clone https://github.com/varunmundas-de-stack/convAI-multi-tenant-cubejs.git
 cd Conve-AI-Project-RelDB-Only
 
 # 3. Install dependencies (one command)
@@ -139,7 +139,7 @@ mkdir projects
 cd projects
 
 # Clone the repository
-git clone https://github.com/varunmundas-de-stack/Conve-AI-Project-RelDB-Only.git
+git clone https://github.com/varunmundas-de-stack/convAI-multi-tenant-cubejs.git
 
 # Enter the project folder
 cd Conve-AI-Project-RelDB-Only
@@ -151,7 +151,7 @@ dir
 
 #### **Option B: Download ZIP (If no Git)**
 
-1. Open browser: https://github.com/varunmundas-de-stack/Conve-AI-Project-RelDB-Only
+1. Open browser: https://github.com/varunmundas-de-stack/convAI-multi-tenant-cubejs
 2. Click green **"Code"** button
 3. Click **"Download ZIP"**
 4. Extract ZIP to `D:\projects\Conve-AI-Project-RelDB-Only`
@@ -736,7 +736,7 @@ logging.basicConfig(
 1. Check [Troubleshooting](#troubleshooting) section above
 2. Review [ARCHITECTURE.md](ARCHITECTURE.md) for technical details
 3. Check logs: `app.log` (if enabled)
-4. GitHub Issues: https://github.com/varunmundas-de-stack/Conve-AI-Project-RelDB-Only/issues
+4. GitHub Issues: https://github.com/varunmundas-de-stack/convAI-multi-tenant-cubejs/issues
 
 ---
 
