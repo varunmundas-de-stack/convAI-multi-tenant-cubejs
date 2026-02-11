@@ -62,3 +62,27 @@ requirements_extracted.txt
 
 # Claude Code
 .claude/
+
+# SENSITIVE: Never commit these
+NOTES.md
+PRIVATE*.md
+emails/
+conversations/
+chat_logs/
+*_conversation*.txt
+*_email*.txt
+
+# Database-specific
+database/users.db
+database/*_olap.duckdb
+database/postgres/
+database/mssql/
+
+# dbt specific
+dbt_project/sales_analytics/target/
+dbt_project/sales_analytics/dbt_packages/
+dbt_project/sales_analytics/logs/
+
+# Cube.js specific
+cubejs_project/.cubestore/
+cubejs_project/node_modules/
