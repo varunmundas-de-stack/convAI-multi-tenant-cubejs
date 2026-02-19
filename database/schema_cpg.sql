@@ -24,7 +24,7 @@ CREATE TABLE dim_date (
     week_of_month INTEGER
 );
 
--- Dimension: Product (Manufacturer → Division → Category → Brand → SKU)
+-- Dimension: Product (Manufacturer → Division → Category → Subcategory → Brand → SKU)
 CREATE TABLE dim_product (
     product_key INTEGER PRIMARY KEY,
     sku_code VARCHAR,
@@ -33,6 +33,8 @@ CREATE TABLE dim_product (
     brand_code VARCHAR,
     category_name VARCHAR,
     category_code VARCHAR,
+    subcategory_code VARCHAR,
+    subcategory_name VARCHAR,
     division_name VARCHAR,
     manufacturer_name VARCHAR,
     pack_size VARCHAR,
@@ -93,6 +95,32 @@ CREATE TABLE dim_channel (
     channel_description VARCHAR
 );
 
+-- Dimension: Sales Hierarchy (SO → ASM → ZSM → NSM)
+CREATE TABLE dim_sales_hierarchy (
+    sales_hierarchy_key INTEGER PRIMARY KEY,
+    so_code VARCHAR,
+    so_name VARCHAR,
+    so_employee_id VARCHAR,
+    asm_code VARCHAR,
+    asm_name VARCHAR,
+    asm_employee_id VARCHAR,
+    zsm_code VARCHAR,
+    zsm_name VARCHAR,
+    zsm_employee_id VARCHAR,
+    nsm_code VARCHAR,
+    nsm_name VARCHAR,
+    nsm_employee_id VARCHAR,
+    territory_code VARCHAR,
+    territory_name VARCHAR,
+    region_code VARCHAR,
+    region_name VARCHAR,
+    zone_code VARCHAR,
+    zone_name VARCHAR,
+    is_active BOOLEAN DEFAULT 1,
+    effective_date DATE,
+    expiry_date DATE
+);
+
 -- Fact: Secondary Sales (Distributor to Retailer)
 CREATE TABLE fact_secondary_sales (
     sales_key INTEGER PRIMARY KEY,
@@ -101,6 +129,7 @@ CREATE TABLE fact_secondary_sales (
     geography_key INTEGER,
     customer_key INTEGER,
     channel_key INTEGER,
+    sales_hierarchy_key INTEGER,
     invoice_number VARCHAR,
     invoice_date DATE,
     invoice_value DECIMAL(15,2),
@@ -118,6 +147,10 @@ CREATE TABLE fact_secondary_sales (
     sales_type VARCHAR,  -- Regular, Promotional, Sample
     payment_terms VARCHAR,  -- Cash, Credit
     payment_status VARCHAR,  -- Paid, Pending, Overdue
+    unit_weight DECIMAL(10,3),
+    unit_volume DECIMAL(10,3),
+    total_weight DECIMAL(12,3),
+    total_volume DECIMAL(12,3),
     FOREIGN KEY (date_key) REFERENCES dim_date(date_key),
     FOREIGN KEY (product_key) REFERENCES dim_product(product_key),
     FOREIGN KEY (geography_key) REFERENCES dim_geography(geography_key),
@@ -140,6 +173,8 @@ CREATE TABLE fact_primary_sales (
     dispatch_value DECIMAL(15,2),
     pending_quantity INTEGER,
     freight_cost DECIMAL(15,2),
+    companywh_code VARCHAR,
+    companywh_name VARCHAR,
     FOREIGN KEY (date_key) REFERENCES dim_date(date_key),
     FOREIGN KEY (product_key) REFERENCES dim_product(product_key),
     FOREIGN KEY (customer_key) REFERENCES dim_customer(customer_key),
@@ -195,6 +230,7 @@ CREATE INDEX idx_secondary_sales_product ON fact_secondary_sales(product_key);
 CREATE INDEX idx_secondary_sales_geography ON fact_secondary_sales(geography_key);
 CREATE INDEX idx_secondary_sales_customer ON fact_secondary_sales(customer_key);
 CREATE INDEX idx_secondary_sales_channel ON fact_secondary_sales(channel_key);
+CREATE INDEX idx_secondary_sales_hierarchy ON fact_secondary_sales(sales_hierarchy_key);
 CREATE INDEX idx_secondary_sales_invoice_date ON fact_secondary_sales(invoice_date);
 
 CREATE INDEX idx_primary_sales_date ON fact_primary_sales(date_key);
@@ -205,3 +241,8 @@ CREATE INDEX idx_inventory_product ON fact_inventory(product_key);
 
 CREATE INDEX idx_distribution_date ON fact_distribution(date_key);
 CREATE INDEX idx_distribution_product ON fact_distribution(product_key);
+
+CREATE INDEX idx_sales_hierarchy_so ON dim_sales_hierarchy(so_code);
+CREATE INDEX idx_sales_hierarchy_asm ON dim_sales_hierarchy(asm_code);
+CREATE INDEX idx_sales_hierarchy_zsm ON dim_sales_hierarchy(zsm_code);
+CREATE INDEX idx_sales_hierarchy_territory ON dim_sales_hierarchy(territory_code);

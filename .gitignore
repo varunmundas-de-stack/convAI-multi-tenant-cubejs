@@ -83,6 +83,10 @@ dbt_project/sales_analytics/target/
 dbt_project/sales_analytics/dbt_packages/
 dbt_project/sales_analytics/logs/
 
+# Node / npm
+node_modules/
+package-lock.json
+
 # Cube.js specific
 cubejs_project/.cubestore/
 cubejs_project/node_modules/

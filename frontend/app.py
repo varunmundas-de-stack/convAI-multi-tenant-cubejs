@@ -367,8 +367,11 @@ Common issues:
         else:
             response = format_single_query_response(result)
 
-        # 6. Audit log
+        # 6. Audit log with department tracking
         query_id = f"Q{int(time.time())}"
+        department = getattr(demo_user, 'department', 'analytics')
+        tenant_id = 'demo_tenant'  # In production, get from user context
+
         audit_logger.log_query(
             query_id=query_id,
             user_id=demo_user.user_id,
@@ -377,8 +380,23 @@ Common issues:
             result_count=result.get('metadata', {}).get('row_count', 0),
             exec_time=exec_time,
             success=True,
-            error=None
+            error=None,
+            tenant_id=tenant_id,
+            department=department
         )
+
+        # TODO: Wire MetricsTracker for LLM token/cost tracking
+        # from observability.metrics_tracker import MetricsTracker, QueryMetrics
+        # metrics_tracker = MetricsTracker("database/observability.db")
+        # query_metrics = QueryMetrics(
+        #     query_id=query_id,
+        #     tenant_id=tenant_id,
+        #     department=department,
+        #     tokens_used=0,  # Get from LLM response
+        #     cost_usd=0.0,   # Calculate based on model pricing
+        #     exec_time_ms=exec_time
+        # )
+        # metrics_tracker.track_query(query_metrics)
 
         return jsonify({
             'success': True,

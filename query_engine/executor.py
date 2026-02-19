@@ -3,6 +3,7 @@ Query Executor - Executes SQL queries against DuckDB
 """
 import duckdb
 import time
+import decimal
 from typing import List, Dict, Any
 from pathlib import Path
 from semantic_layer.models import QueryResult
@@ -45,10 +46,15 @@ class QueryExecutor:
             rows = result.fetchall()
             columns = [desc[0] for desc in result.description]
 
-            # Convert to list of dicts
+            # Convert to list of dicts, normalizing non-JSON-safe types
             data = []
             for row in rows:
-                data.append(dict(zip(columns, row)))
+                row_dict = {}
+                for col, val in zip(columns, row):
+                    if isinstance(val, decimal.Decimal):
+                        val = float(val)
+                    row_dict[col] = val
+                data.append(row_dict)
 
             execution_time = (time.time() - start_time) * 1000  # ms
 

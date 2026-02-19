@@ -67,6 +67,15 @@ class Literal(ASTNode):
 
 
 @dataclass
+class RawSQLExpr(ASTNode):
+    """Raw SQL expression — used for complex conditions that don't fit the AST model"""
+    sql: str
+
+    def to_sql(self, dialect: str = "duckdb") -> str:
+        return self.sql
+
+
+@dataclass
 class AggregateExpr(ASTNode):
     """Aggregate function: SUM, AVG, COUNT, etc."""
     function: str  # SUM, AVG, COUNT, MIN, MAX

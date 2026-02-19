@@ -75,18 +75,21 @@ def generate_date_dimension(conn):
     print(f"  Generated {len(dates)} date records")
 
 def generate_product_dimension(conn):
-    """Generate product dimension with hierarchy"""
+    """Generate product dimension with hierarchy including subcategories"""
     print("Generating product dimension...")
 
     categories = [
-        {'code': 'BEV', 'name': 'Beverages', 'brands': [
-            'Brand-A', 'Brand-B', 'Brand-C'
+        {'code': 'BEV', 'name': 'Beverages', 'subcategories': [
+            {'code': 'SOFT', 'name': 'Soft Drinks', 'brands': ['Brand-A', 'Brand-B']},
+            {'code': 'JUICE', 'name': 'Juices', 'brands': ['Brand-C']}
         ]},
-        {'code': 'SNK', 'name': 'Snacks', 'brands': [
-            'Brand-D', 'Brand-E', 'Brand-F', 'Brand-G'
+        {'code': 'SNK', 'name': 'Snacks', 'subcategories': [
+            {'code': 'CHIPS', 'name': 'Chips', 'brands': ['Brand-D', 'Brand-E']},
+            {'code': 'BISC', 'name': 'Biscuits', 'brands': ['Brand-F', 'Brand-G']}
         ]},
-        {'code': 'DRY', 'name': 'Dairy', 'brands': [
-            'Brand-H', 'Brand-I', 'Brand-J'
+        {'code': 'DRY', 'name': 'Dairy', 'subcategories': [
+            {'code': 'MILK', 'name': 'Milk Products', 'brands': ['Brand-H', 'Brand-I']},
+            {'code': 'YOG', 'name': 'Yogurt', 'brands': ['Brand-J']}
         ]}
     ]
 
@@ -100,35 +103,40 @@ def generate_product_dimension(conn):
     product_key = 1
 
     for category in categories:
-        for brand in category['brands']:
-            brand_code = brand.replace('Brand-', 'BR')
-            num_skus_per_brand = NUM_SKUS // NUM_BRANDS
+        for subcategory in category['subcategories']:
+            for brand in subcategory['brands']:
+                brand_code = brand.replace('Brand-', 'BR')
+                num_skus_per_brand = NUM_SKUS // NUM_BRANDS
 
-            for sku_idx in range(num_skus_per_brand):
-                pack = random.choice(pack_sizes)
-                sku_code = f"{brand_code}{category['code']}{sku_idx+1:03d}"
+                for sku_idx in range(num_skus_per_brand):
+                    pack = random.choice(pack_sizes)
+                    sku_code = f"{brand_code}{subcategory['code']}{sku_idx+1:03d}"
 
-                products.append({
-                    'product_key': product_key,
-                    'sku_code': sku_code,
-                    'sku_name': f"{brand} {category['name']} {pack[0]}",
-                    'brand_name': brand,
-                    'brand_code': brand_code,
-                    'category_name': category['name'],
-                    'category_code': category['code'],
-                    'division_name': 'FMCG Division',
-                    'manufacturer_name': 'ABC Consumer Products Ltd',
-                    'pack_size': pack[0],
-                    'pack_size_value': pack[1],
-                    'pack_size_unit': pack[2],
-                    'mrp': round(random.uniform(10, 500), 2),
-                    'product_status': random.choice(['Active'] * 9 + ['Discontinued']),
-                    'launch_date': (datetime.now() - timedelta(days=random.randint(30, 1800))).strftime('%Y-%m-%d'),
-                    'is_focus_brand': random.random() < 0.3,
-                    'hsn_code': f'{random.randint(1000, 9999)}'
-                })
-                product_key += 1
+                    products.append({
+                        'product_key': product_key,
+                        'sku_code': sku_code,
+                        'sku_name': f"{brand} {subcategory['name']} {pack[0]}",
+                        'brand_name': brand,
+                        'brand_code': brand_code,
+                        'category_name': category['name'],
+                        'category_code': category['code'],
+                        'subcategory_code': subcategory['code'],
+                        'subcategory_name': subcategory['name'],
+                        'division_name': 'FMCG Division',
+                        'manufacturer_name': 'ABC Consumer Products Ltd',
+                        'pack_size': pack[0],
+                        'pack_size_value': pack[1],
+                        'pack_size_unit': pack[2],
+                        'mrp': round(random.uniform(10, 500), 2),
+                        'product_status': random.choice(['Active'] * 9 + ['Discontinued']),
+                        'launch_date': (datetime.now() - timedelta(days=random.randint(30, 1800))).strftime('%Y-%m-%d'),
+                        'is_focus_brand': random.random() < 0.3,
+                        'hsn_code': f'{random.randint(1000, 9999)}'
+                    })
+                    product_key += 1
 
+                    if product_key > NUM_SKUS:
+                        break
                 if product_key > NUM_SKUS:
                     break
             if product_key > NUM_SKUS:
@@ -139,13 +147,13 @@ def generate_product_dimension(conn):
     conn.execute("DELETE FROM dim_product")
     conn.executemany("""
         INSERT INTO dim_product VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
     """, [(p['product_key'], p['sku_code'], p['sku_name'], p['brand_name'],
-           p['brand_code'], p['category_name'], p['category_code'], p['division_name'],
-           p['manufacturer_name'], p['pack_size'], p['pack_size_value'], p['pack_size_unit'],
-           p['mrp'], p['product_status'], p['launch_date'], p['is_focus_brand'],
-           p['hsn_code']) for p in products])
+           p['brand_code'], p['category_name'], p['category_code'], p['subcategory_code'],
+           p['subcategory_name'], p['division_name'], p['manufacturer_name'], p['pack_size'],
+           p['pack_size_value'], p['pack_size_unit'], p['mrp'], p['product_status'],
+           p['launch_date'], p['is_focus_brand'], p['hsn_code']) for p in products])
 
     print(f"  Generated {len(products)} product records")
 
@@ -324,9 +332,105 @@ def generate_channel_dimension(conn):
 
     print(f"  Generated {len(channels)} channel records")
 
-def generate_fact_secondary_sales(conn):
-    """Generate secondary sales facts"""
-    print("Generating secondary sales facts...")
+def generate_sales_hierarchy_dimension(conn):
+    """Generate sales hierarchy dimension (SO → ASM → ZSM → NSM)"""
+    print("Generating sales hierarchy dimension...")
+
+    hierarchies = []
+    hierarchy_key = 1
+
+    # 2 NSMs (National Sales Managers)
+    nsms = [
+        {'code': 'NSM01', 'name': 'Rajesh Kumar', 'emp_id': 'E1001'},
+        {'code': 'NSM02', 'name': 'Priya Sharma', 'emp_id': 'E1002'}
+    ]
+
+    zones = ['North', 'South', 'East', 'West']
+
+    for nsm in nsms:
+        # 2 ZSMs per NSM (4 zones)
+        for zsm_idx in range(2):
+            zone = zones[nsms.index(nsm) * 2 + zsm_idx]
+            zsm_code = f"ZSM{nsms.index(nsm) * 2 + zsm_idx + 1:02d}"
+            zsm = {
+                'code': zsm_code,
+                'name': f"ZSM {zone}",
+                'emp_id': f"E20{nsms.index(nsm) * 2 + zsm_idx + 1:02d}"
+            }
+
+            # 2 ASMs per ZSM (8 regions)
+            for asm_idx in range(2):
+                asm_code = f"{zsm_code}_ASM{asm_idx + 1}"
+                region_code = f"RG{(nsms.index(nsm) * 4 + zsm_idx * 2 + asm_idx + 1):02d}"
+                asm = {
+                    'code': asm_code,
+                    'name': f"ASM {zone} Region-{asm_idx + 1}",
+                    'emp_id': f"E30{(nsms.index(nsm) * 4 + zsm_idx * 2 + asm_idx + 1):02d}"
+                }
+
+                # 5 SOs per ASM (40 territories)
+                for so_idx in range(5):
+                    so_code = f"{asm_code}_SO{so_idx + 1:02d}"
+                    territory_code = f"TER{hierarchy_key:03d}"
+
+                    hierarchies.append({
+                        'sales_hierarchy_key': hierarchy_key,
+                        'so_code': so_code,
+                        'so_name': f"Sales Officer {hierarchy_key}",
+                        'so_employee_id': f"E40{hierarchy_key:03d}",
+                        'asm_code': asm['code'],
+                        'asm_name': asm['name'],
+                        'asm_employee_id': asm['emp_id'],
+                        'zsm_code': zsm['code'],
+                        'zsm_name': zsm['name'],
+                        'zsm_employee_id': zsm['emp_id'],
+                        'nsm_code': nsm['code'],
+                        'nsm_name': nsm['name'],
+                        'nsm_employee_id': nsm['emp_id'],
+                        'territory_code': territory_code,
+                        'territory_name': f"Territory {hierarchy_key}",
+                        'region_code': region_code,
+                        'region_name': f"{zone} Region-{asm_idx + 1}",
+                        'zone_code': zone[:2].upper(),
+                        'zone_name': zone,
+                        'is_active': True,
+                        'effective_date': (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'),
+                        'expiry_date': None
+                    })
+                    hierarchy_key += 1
+
+    conn.execute("DELETE FROM dim_sales_hierarchy")
+    conn.executemany("""
+        INSERT INTO dim_sales_hierarchy VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        )
+    """, [(h['sales_hierarchy_key'], h['so_code'], h['so_name'], h['so_employee_id'],
+           h['asm_code'], h['asm_name'], h['asm_employee_id'], h['zsm_code'],
+           h['zsm_name'], h['zsm_employee_id'], h['nsm_code'], h['nsm_name'],
+           h['nsm_employee_id'], h['territory_code'], h['territory_name'],
+           h['region_code'], h['region_name'], h['zone_code'], h['zone_name'],
+           h['is_active'], h['effective_date'], h['expiry_date']) for h in hierarchies])
+
+    print(f"  Generated {len(hierarchies)} sales hierarchy records")
+    return hierarchies
+
+def generate_companywh_dimension():
+    """Generate company warehouse dimension"""
+    warehouses = [
+        {'code': 'WH01', 'name': 'Mumbai Warehouse'},
+        {'code': 'WH02', 'name': 'Delhi Warehouse'},
+        {'code': 'WH03', 'name': 'Bangalore Warehouse'},
+        {'code': 'WH04', 'name': 'Chennai Warehouse'},
+        {'code': 'WH05', 'name': 'Kolkata Warehouse'},
+        {'code': 'WH06', 'name': 'Hyderabad Warehouse'},
+        {'code': 'WH07', 'name': 'Pune Warehouse'},
+        {'code': 'WH08', 'name': 'Ahmedabad Warehouse'}
+    ]
+    return warehouses
+
+def generate_fact_primary_sales(conn, warehouses):
+    """Generate primary sales facts (manufacturer to distributor)"""
+    print("Generating primary sales facts...")
 
     # Get dimension keys
     date_keys = conn.execute("SELECT date_key FROM dim_date").fetchall()
@@ -335,6 +439,76 @@ def generate_fact_secondary_sales(conn):
     product_keys = conn.execute("SELECT product_key FROM dim_product WHERE product_status = 'Active'").fetchall()
     product_keys = [p[0] for p in product_keys]
 
+    # Get distributors only
+    customer_keys = conn.execute("SELECT customer_key FROM dim_customer WHERE outlet_type = 'Distributor' AND customer_status = 'Active'").fetchall()
+    customer_keys = [c[0] for c in customer_keys]
+
+    channel_keys = [1, 2, 3, 4, 5]
+
+    # Generate 500 primary sales records
+    num_primary_sales = 500
+    primary_sales = []
+
+    for i in range(1, num_primary_sales + 1):
+        order_quantity = random.randint(100, 5000)
+        order_value = round(order_quantity * random.uniform(40, 400), 2)
+        dispatch_quantity = int(order_quantity * random.uniform(0.8, 1.0))
+        dispatch_value = round(dispatch_quantity * (order_value / order_quantity), 2)
+        pending_quantity = order_quantity - dispatch_quantity
+        freight_cost = round(dispatch_value * random.uniform(0.02, 0.05), 2)
+
+        date_key = random.choice(date_keys)
+        order_date = datetime.strptime(str(date_key), '%Y%m%d').strftime('%Y-%m-%d')
+
+        warehouse = random.choice(warehouses)
+
+        primary_sales.append({
+            'primary_sales_key': i,
+            'date_key': date_key,
+            'product_key': random.choice(product_keys),
+            'customer_key': random.choice(customer_keys),
+            'channel_key': random.choice(channel_keys),
+            'order_number': f"PO{i:08d}",
+            'order_date': order_date,
+            'order_quantity': order_quantity,
+            'order_value': order_value,
+            'dispatch_quantity': dispatch_quantity,
+            'dispatch_value': dispatch_value,
+            'pending_quantity': pending_quantity,
+            'freight_cost': freight_cost,
+            'companywh_code': warehouse['code'],
+            'companywh_name': warehouse['name']
+        })
+
+    conn.execute("DELETE FROM fact_primary_sales")
+    conn.executemany("""
+        INSERT INTO fact_primary_sales VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        )
+    """, [(s['primary_sales_key'], s['date_key'], s['product_key'], s['customer_key'],
+           s['channel_key'], s['order_number'], s['order_date'], s['order_quantity'],
+           s['order_value'], s['dispatch_quantity'], s['dispatch_value'],
+           s['pending_quantity'], s['freight_cost'], s['companywh_code'],
+           s['companywh_name']) for s in primary_sales])
+
+    print(f"  Generated {len(primary_sales)} primary sales records")
+
+def generate_fact_secondary_sales(conn, sales_hierarchies):
+    """Generate secondary sales facts with weight/volume and sales hierarchy"""
+    print("Generating secondary sales facts...")
+
+    # Get dimension keys
+    date_keys = conn.execute("SELECT date_key FROM dim_date").fetchall()
+    date_keys = [d[0] for d in date_keys]
+
+    # Get products with pack size info for weight/volume calculation
+    products = conn.execute("""
+        SELECT product_key, pack_size_unit, pack_size_value
+        FROM dim_product
+        WHERE product_status = 'Active'
+    """).fetchall()
+    products = [{'key': p[0], 'unit': p[1], 'value': p[2]} for p in products]
+
     geography_keys = conn.execute("SELECT geography_key FROM dim_geography").fetchall()
     geography_keys = [g[0] for g in geography_keys]
 
@@ -342,6 +516,7 @@ def generate_fact_secondary_sales(conn):
     customer_keys = [c[0] for c in customer_keys]
 
     channel_keys = [1, 2, 3, 4, 5]
+    hierarchy_keys = [h['sales_hierarchy_key'] for h in sales_hierarchies]
 
     sales_types = ['Regular', 'Promotional', 'Sample']
     payment_terms = ['Cash', 'Credit']
@@ -362,13 +537,27 @@ def generate_fact_secondary_sales(conn):
         date_key = random.choice(date_keys)
         invoice_date = datetime.strptime(str(date_key), '%Y%m%d').strftime('%Y-%m-%d')
 
+        # Select product and calculate weight/volume
+        product = random.choice(products)
+        unit_weight = 0.0
+        unit_volume = 0.0
+
+        if product['unit'] == 'gm':
+            unit_weight = product['value'] / 1000  # Convert to kg
+        elif product['unit'] == 'ml':
+            unit_volume = product['value'] / 1000  # Convert to liters
+
+        total_weight = round(unit_weight * invoice_quantity, 3)
+        total_volume = round(unit_volume * invoice_quantity, 3)
+
         sales.append({
             'sales_key': i,
             'date_key': date_key,
-            'product_key': random.choice(product_keys),
+            'product_key': product['key'],
             'geography_key': random.choice(geography_keys),
             'customer_key': random.choice(customer_keys),
             'channel_key': random.choice(channel_keys),
+            'sales_hierarchy_key': random.choice(hierarchy_keys),
             'invoice_number': f"INV{i:08d}",
             'invoice_date': invoice_date,
             'invoice_value': invoice_value,
@@ -385,22 +574,132 @@ def generate_fact_secondary_sales(conn):
             'sales_rep_code': f"SR{random.randint(1, 50):03d}",
             'sales_type': random.choice(sales_types),
             'payment_terms': random.choice(payment_terms),
-            'payment_status': random.choice(payment_statuses)
+            'payment_status': random.choice(payment_statuses),
+            'unit_weight': unit_weight,
+            'unit_volume': unit_volume,
+            'total_weight': total_weight,
+            'total_volume': total_volume
         })
 
     conn.execute("DELETE FROM fact_secondary_sales")
     conn.executemany("""
         INSERT INTO fact_secondary_sales VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
     """, [(s['sales_key'], s['date_key'], s['product_key'], s['geography_key'],
-           s['customer_key'], s['channel_key'], s['invoice_number'], s['invoice_date'],
-           s['invoice_value'], s['invoice_quantity'], s['base_price'], s['discount_amount'],
-           s['discount_percentage'], s['tax_amount'], s['net_value'], s['margin_amount'],
-           s['margin_percentage'], s['return_flag'], s['return_amount'], s['sales_rep_code'],
-           s['sales_type'], s['payment_terms'], s['payment_status']) for s in sales])
+           s['customer_key'], s['channel_key'], s['sales_hierarchy_key'], s['invoice_number'],
+           s['invoice_date'], s['invoice_value'], s['invoice_quantity'], s['base_price'],
+           s['discount_amount'], s['discount_percentage'], s['tax_amount'], s['net_value'],
+           s['margin_amount'], s['margin_percentage'], s['return_flag'], s['return_amount'],
+           s['sales_rep_code'], s['sales_type'], s['payment_terms'], s['payment_status'],
+           s['unit_weight'], s['unit_volume'], s['total_weight'], s['total_volume']) for s in sales])
 
     print(f"  Generated {len(sales)} secondary sales records")
+
+def generate_fact_inventory(conn):
+    """Generate inventory facts (opening/closing stock per product per outlet)"""
+    print("Generating inventory facts...")
+
+    date_keys = conn.execute("SELECT date_key FROM dim_date ORDER BY date_key").fetchall()
+    # Use weekly snapshots — pick one date per week
+    weekly_dates = [date_keys[i][0] for i in range(0, len(date_keys), 7)]
+
+    product_keys = conn.execute("SELECT product_key FROM dim_product WHERE product_status = 'Active'").fetchall()
+    product_keys = [p[0] for p in product_keys]
+
+    geography_keys = conn.execute("SELECT geography_key FROM dim_geography").fetchall()
+    geography_keys = [g[0] for g in geography_keys]
+
+    customer_keys = conn.execute("SELECT customer_key FROM dim_customer WHERE retailer_code IS NOT NULL").fetchall()
+    customer_keys = [c[0] for c in customer_keys]
+
+    stock_statuses = ['Normal', 'Below Reorder', 'Overstock', 'Out of Stock']
+    stock_status_weights = [0.6, 0.2, 0.1, 0.1]
+
+    records = []
+    inventory_key = 1
+    # Generate ~200 records: sample products × weekly dates
+    for date_key in weekly_dates[:4]:  # 4 weekly snapshots
+        for product_key in random.sample(product_keys, min(50, len(product_keys))):
+            reorder_level = random.randint(20, 100)
+            max_stock = reorder_level * random.randint(3, 8)
+            opening_stock = random.randint(0, max_stock)
+            receipts = random.randint(0, max_stock // 2)
+            issues = random.randint(0, min(opening_stock + receipts, max_stock // 2))
+            closing_stock = opening_stock + receipts - issues
+            stock_value = round(closing_stock * random.uniform(40, 400), 2)
+            days_of_supply = round(closing_stock / max(issues, 1) * 7, 1) if issues > 0 else 999.9
+
+            if closing_stock == 0:
+                status = 'Out of Stock'
+            elif closing_stock < reorder_level:
+                status = 'Below Reorder'
+            elif closing_stock > max_stock:
+                status = 'Overstock'
+            else:
+                status = 'Normal'
+
+            records.append((
+                inventory_key, date_key, product_key,
+                random.choice(geography_keys), random.choice(customer_keys),
+                opening_stock, closing_stock, receipts, issues, stock_value,
+                days_of_supply, reorder_level, max_stock, status
+            ))
+            inventory_key += 1
+
+    conn.execute("DELETE FROM fact_inventory")
+    conn.executemany("""
+        INSERT INTO fact_inventory VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, records)
+
+    print(f"  Generated {len(records)} inventory records")
+
+
+def generate_fact_distribution(conn):
+    """Generate distribution metrics per product per geography per week"""
+    print("Generating distribution facts...")
+
+    date_keys = conn.execute("SELECT date_key FROM dim_date ORDER BY date_key").fetchall()
+    weekly_dates = [date_keys[i][0] for i in range(0, len(date_keys), 7)]
+
+    product_keys = conn.execute("SELECT product_key FROM dim_product WHERE product_status = 'Active'").fetchall()
+    product_keys = [p[0] for p in product_keys]
+
+    geography_keys = conn.execute("SELECT geography_key FROM dim_geography").fetchall()
+    geography_keys = [g[0] for g in geography_keys]
+
+    channel_keys = [1, 2, 3, 4, 5]
+
+    records = []
+    dist_key = 1
+    for date_key in weekly_dates[:4]:  # 4 weekly snapshots
+        for product_key in random.sample(product_keys, min(50, len(product_keys))):
+            total_outlets = random.randint(50, 500)
+            outlets_with_stock = random.randint(int(total_outlets * 0.3), total_outlets)
+            outlets_with_sales = random.randint(int(outlets_with_stock * 0.5), outlets_with_stock)
+            out_of_stock = total_outlets - outlets_with_stock
+            numeric_dist = round((outlets_with_sales / total_outlets) * 100, 2)
+            weighted_dist = round(numeric_dist * random.uniform(0.8, 1.2), 2)
+            weighted_dist = min(weighted_dist, 100.0)
+            share_of_shelf = round(random.uniform(5, 40), 2)
+            avg_facing = round(random.uniform(1.5, 6.0), 2)
+
+            records.append((
+                dist_key, date_key, product_key,
+                random.choice(geography_keys), random.choice(channel_keys),
+                total_outlets, outlets_with_stock, outlets_with_sales,
+                numeric_dist, weighted_dist, share_of_shelf,
+                out_of_stock, avg_facing
+            ))
+            dist_key += 1
+
+    conn.execute("DELETE FROM fact_distribution")
+    conn.executemany("""
+        INSERT INTO fact_distribution VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, records)
+
+    print(f"  Generated {len(records)} distribution records")
+
 
 def main():
     """Main function to generate all CPG sample data"""
@@ -429,9 +728,14 @@ def main():
     generate_geography_dimension(conn)
     generate_customer_dimension(conn)
     generate_channel_dimension(conn)
+    sales_hierarchies = generate_sales_hierarchy_dimension(conn)
+    warehouses = generate_companywh_dimension()
 
     # Generate facts
-    generate_fact_secondary_sales(conn)
+    generate_fact_primary_sales(conn, warehouses)
+    generate_fact_secondary_sales(conn, sales_hierarchies)
+    generate_fact_inventory(conn)
+    generate_fact_distribution(conn)
 
     # Show summary
     print("\n" + "="*60)
@@ -439,7 +743,8 @@ def main():
     print("="*60)
     print("\nTable counts:")
     tables = ['dim_date', 'dim_product', 'dim_geography', 'dim_customer',
-              'dim_channel', 'fact_secondary_sales']
+              'dim_channel', 'dim_sales_hierarchy', 'fact_primary_sales',
+              'fact_secondary_sales', 'fact_inventory', 'fact_distribution']
 
     for table in tables:
         count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]

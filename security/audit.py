@@ -29,7 +29,9 @@ class AuditLogger:
         result_count: int,
         exec_time: float,
         success: bool = True,
-        error: str = None
+        error: str = None,
+        tenant_id: str = None,
+        department: str = None
     ):
         """
         Log query execution.
@@ -43,11 +45,15 @@ class AuditLogger:
             exec_time: Execution time in milliseconds
             success: Whether query succeeded
             error: Error message if failed
+            tenant_id: Tenant/client ID for multi-tenant tracking
+            department: User's department for cost allocation
         """
         record = {
             'timestamp': datetime.utcnow().isoformat(),
             'query_id': query_id,
             'user_id': user_id,
+            'tenant_id': tenant_id,
+            'department': department,
             'question': semantic_query.get('original_question', ''),
             'intent': semantic_query.get('intent', 'unknown'),
             'metric': semantic_query.get('metric_request', {}).get('primary_metric', ''),

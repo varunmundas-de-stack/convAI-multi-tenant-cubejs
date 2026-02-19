@@ -11,11 +11,16 @@ from semantic_layer.schemas import SemanticQuery, Filter
 class UserContext:
     """User security context"""
     user_id: str
-    role: str  # 'sales_rep', 'manager', 'executive', 'admin'
+    role: str  # 'SO', 'ASM', 'ZSM', 'NSM', 'sales_rep', 'manager', 'executive', 'admin'
     territories: List[str] = None  # Territory codes
     regions: List[str] = None  # Region/Zone codes
     states: List[str] = None  # State names
     data_access_level: str = "territory"  # territory, region, state, national
+    sales_hierarchy_level: str = None  # 'SO', 'ASM', 'ZSM', 'NSM', or None
+    so_codes: List[str] = None  # Sales Officer codes
+    asm_codes: List[str] = None  # Area Sales Manager codes
+    zsm_codes: List[str] = None  # Zonal Sales Manager codes
+    nsm_codes: List[str] = None  # National Sales Manager codes
 
     def __post_init__(self):
         if self.territories is None:
@@ -24,6 +29,14 @@ class UserContext:
             self.regions = []
         if self.states is None:
             self.states = []
+        if self.so_codes is None:
+            self.so_codes = []
+        if self.asm_codes is None:
+            self.asm_codes = []
+        if self.zsm_codes is None:
+            self.zsm_codes = []
+        if self.nsm_codes is None:
+            self.nsm_codes = []
 
 
 class RowLevelSecurity:
@@ -52,7 +65,49 @@ class RowLevelSecurity:
         from copy import deepcopy
         secured_query = deepcopy(semantic_query)
 
-        # Apply filters based on data access level
+        # PRIORITY 1: Sales Hierarchy Filtering (takes precedence over geography)
+        if user.sales_hierarchy_level:
+            if user.sales_hierarchy_level == "SO" and user.so_codes:
+                # Sales Officer - most restrictive
+                so_filter = Filter(
+                    dimension="so_code",
+                    operator="IN",
+                    values=user.so_codes
+                )
+                secured_query.filters.append(so_filter)
+                return secured_query
+
+            elif user.sales_hierarchy_level == "ASM" and user.asm_codes:
+                # Area Sales Manager
+                asm_filter = Filter(
+                    dimension="asm_code",
+                    operator="IN",
+                    values=user.asm_codes
+                )
+                secured_query.filters.append(asm_filter)
+                return secured_query
+
+            elif user.sales_hierarchy_level == "ZSM" and user.zsm_codes:
+                # Zonal Sales Manager
+                zsm_filter = Filter(
+                    dimension="zsm_code",
+                    operator="IN",
+                    values=user.zsm_codes
+                )
+                secured_query.filters.append(zsm_filter)
+                return secured_query
+
+            elif user.sales_hierarchy_level == "NSM" and user.nsm_codes:
+                # National Sales Manager - see specific NSM data
+                nsm_filter = Filter(
+                    dimension="nsm_code",
+                    operator="IN",
+                    values=user.nsm_codes
+                )
+                secured_query.filters.append(nsm_filter)
+                return secured_query
+
+        # PRIORITY 2: Geographic Filtering (if no sales hierarchy)
         if user.data_access_level == "state" and user.states:
             # State-level access
             state_filter = Filter(
@@ -97,7 +152,41 @@ class RowLevelSecurity:
         Returns:
             UserContext with appropriate access levels
         """
-        if role == "executive" or role == "admin":
+        # Sales Hierarchy Roles
+        if role == "NSM":
+            return UserContext(
+                user_id=user_id,
+                role=role,
+                data_access_level="national",
+                sales_hierarchy_level="NSM",
+                nsm_codes=["NSM01"]  # Example
+            )
+        elif role == "ZSM":
+            return UserContext(
+                user_id=user_id,
+                role=role,
+                data_access_level="region",
+                sales_hierarchy_level="ZSM",
+                zsm_codes=["ZSM01"]  # Example
+            )
+        elif role == "ASM":
+            return UserContext(
+                user_id=user_id,
+                role=role,
+                data_access_level="region",
+                sales_hierarchy_level="ASM",
+                asm_codes=["ZSM01_ASM1"]  # Example
+            )
+        elif role == "SO":
+            return UserContext(
+                user_id=user_id,
+                role=role,
+                data_access_level="territory",
+                sales_hierarchy_level="SO",
+                so_codes=["ZSM01_ASM1_SO01"]  # Example
+            )
+        # Legacy Geographic Roles
+        elif role == "executive" or role == "admin":
             return UserContext(
                 user_id=user_id,
                 role=role,

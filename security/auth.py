@@ -11,13 +11,24 @@ class User(UserMixin):
     """User class for Flask-Login"""
 
     def __init__(self, user_id: int, username: str, email: str,
-                 full_name: str, client_id: str, role: str):
+                 full_name: str, client_id: str, role: str,
+                 department: str = None, sales_hierarchy_level: str = None,
+                 so_code: str = None, asm_code: str = None,
+                 zsm_code: str = None, nsm_code: str = None,
+                 territory_codes: str = None):
         self.id = user_id  # Required by Flask-Login
         self.username = username
         self.email = email
         self.full_name = full_name
         self.client_id = client_id
         self.role = role
+        self.department = department or 'analytics'
+        self.sales_hierarchy_level = sales_hierarchy_level
+        self.so_code = so_code
+        self.asm_code = asm_code
+        self.zsm_code = zsm_code
+        self.nsm_code = nsm_code
+        self.territory_codes = territory_codes
 
     def get_id(self):
         """Required by Flask-Login"""
@@ -48,7 +59,8 @@ class AuthManager:
         # Get user from database
         cursor.execute("""
             SELECT user_id, username, password_hash, email, full_name,
-                   client_id, role, is_active
+                   client_id, role, is_active, department, sales_hierarchy_level,
+                   so_code, asm_code, zsm_code, nsm_code, territory_codes
             FROM users
             WHERE username = ?
         """, (username,))
@@ -59,7 +71,9 @@ class AuthManager:
         if not result:
             return None
 
-        user_id, username, password_hash, email, full_name, client_id, role, is_active = result
+        (user_id, username, password_hash, email, full_name, client_id, role, is_active,
+         department, sales_hierarchy_level, so_code, asm_code, zsm_code, nsm_code,
+         territory_codes) = result
 
         # Check if user is active
         if not is_active:
@@ -72,7 +86,9 @@ class AuthManager:
         # Update last login
         self._update_last_login(user_id)
 
-        return User(user_id, username, email, full_name, client_id, role)
+        return User(user_id, username, email, full_name, client_id, role,
+                    department, sales_hierarchy_level, so_code, asm_code,
+                    zsm_code, nsm_code, territory_codes)
 
     def get_user_by_id(self, user_id: int) -> Optional[User]:
         """Get user by ID (for Flask-Login user_loader)"""
@@ -80,7 +96,9 @@ class AuthManager:
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT user_id, username, email, full_name, client_id, role
+            SELECT user_id, username, email, full_name, client_id, role,
+                   department, sales_hierarchy_level, so_code, asm_code,
+                   zsm_code, nsm_code, territory_codes
             FROM users
             WHERE user_id = ? AND is_active = 1
         """, (user_id,))

@@ -24,6 +24,13 @@ def create_user_database():
             full_name TEXT NOT NULL,
             client_id TEXT NOT NULL,
             role TEXT NOT NULL,
+            department TEXT DEFAULT 'analytics',
+            sales_hierarchy_level TEXT,
+            so_code TEXT,
+            asm_code TEXT,
+            zsm_code TEXT,
+            nsm_code TEXT,
+            territory_codes TEXT,
             is_active BOOLEAN DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_login TIMESTAMP
@@ -93,45 +100,85 @@ def create_sample_data(conn):
             VALUES (?, ?, ?, ?, ?)
         """, client)
 
-    # Sample users (one per client)
+    # Sample users with department and sales hierarchy info
     users = [
         # Nestle users
-        ('nestle_admin', 'nestle123', 'admin@nestle.com',
-         'Nestle Admin', 'nestle', 'admin'),
+        ('nestle_admin', 'admin123', 'admin@nestle.com',
+         'Nestle Admin', 'nestle', 'admin', 'analytics', None, None, None, None, None, None),
         ('nestle_analyst', 'analyst123', 'analyst@nestle.com',
-         'Nestle Analyst', 'nestle', 'analyst'),
+         'Nestle Analyst', 'nestle', 'analyst', 'analytics', None, None, None, None, None, None),
 
         # Unilever users
-        ('unilever_admin', 'unilever123', 'admin@unilever.com',
-         'Unilever Admin', 'unilever', 'admin'),
+        ('unilever_admin', 'admin123', 'admin@unilever.com',
+         'Unilever Admin', 'unilever', 'admin', 'analytics', None, None, None, None, None, None),
         ('unilever_analyst', 'analyst123', 'analyst@unilever.com',
-         'Unilever Analyst', 'unilever', 'analyst'),
+         'Unilever Analyst', 'unilever', 'analyst', 'marketing', None, None, None, None, None, None),
 
         # ITC users
-        ('itc_admin', 'itc123', 'admin@itc.com',
-         'ITC Admin', 'itc', 'admin'),
+        ('itc_admin', 'admin123', 'admin@itc.com',
+         'ITC Admin', 'itc', 'admin', 'analytics', None, None, None, None, None, None),
         ('itc_analyst', 'analyst123', 'analyst@itc.com',
-         'ITC Analyst', 'itc', 'analyst'),
+         'ITC Analyst', 'itc', 'analyst', 'finance', None, None, None, None, None, None),
+
+        # Sales Hierarchy users (Nestle)
+        ('nsm_rajesh', 'nsm123', 'rajesh@nestle.com',
+         'Rajesh Kumar (NSM)', 'nestle', 'NSM', 'sales', 'NSM', None, None, None, 'NSM01', None),
+        ('zsm_amit', 'zsm123', 'amit@nestle.com',
+         'Amit Shah (ZSM North)', 'nestle', 'ZSM', 'sales', 'ZSM', None, None, 'ZSM01', None, None),
+        ('asm_rahul', 'asm123', 'rahul@nestle.com',
+         'Rahul Verma (ASM)', 'nestle', 'ASM', 'sales', 'ASM', None, 'ZSM01_ASM1', None, None, None),
+        ('so_field1', 'so123', 'field1@nestle.com',
+         'Field Officer 1', 'nestle', 'SO', 'sales', 'SO', 'ZSM01_ASM1_SO01', None, None, None, None),
     ]
 
-    for username, password, email, full_name, client_id, role in users:
+    for username, password, email, full_name, client_id, role, department, sales_hierarchy_level, so_code, asm_code, zsm_code, nsm_code, territory_codes in users:
         password_hash = hash_password(password)
         cursor.execute("""
-            INSERT OR IGNORE INTO users
-            (username, password_hash, email, full_name, client_id, role)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (username, password_hash, email, full_name, client_id, role))
+            INSERT INTO users
+            (username, password_hash, email, full_name, client_id, role, department,
+             sales_hierarchy_level, so_code, asm_code, zsm_code, nsm_code, territory_codes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(username) DO UPDATE SET
+                password_hash=excluded.password_hash,
+                email=excluded.email,
+                full_name=excluded.full_name,
+                client_id=excluded.client_id,
+                role=excluded.role,
+                department=excluded.department,
+                sales_hierarchy_level=excluded.sales_hierarchy_level,
+                so_code=excluded.so_code,
+                asm_code=excluded.asm_code,
+                zsm_code=excluded.zsm_code,
+                nsm_code=excluded.nsm_code,
+                territory_codes=excluded.territory_codes
+        """, (username, password_hash, email, full_name, client_id, role, department,
+              sales_hierarchy_level, so_code, asm_code, zsm_code, nsm_code, territory_codes))
 
     conn.commit()
     print("[OK] User database created successfully!")
-    print("\n" + "="*70)
+    print("\n" + "="*90)
     print("SAMPLE USERS CREATED")
-    print("="*70)
-    print(f"{'Username':<20} {'Password':<15} {'Client':<15} {'Role':<10}")
-    print("="*70)
-    for username, password, _, _, client_id, role in users:
-        print(f"{username:<20} {password:<15} {client_id:<15} {role:<10}")
-    print("="*70)
+    print("="*90)
+    print(f"{'Username':<20} {'Password':<15} {'Client':<15} {'Role':<10} {'Department':<12}")
+    print("="*90)
+    for username, password, _, _, client_id, role, department, *_ in users:
+        print(f"{username:<20} {password:<15} {client_id:<15} {role:<10} {department:<12}")
+    print("="*90)
+    print("\nSales Hierarchy Users:")
+    print("-" * 90)
+    for username, password, _, _, client_id, role, department, sales_hierarchy_level, so_code, asm_code, zsm_code, nsm_code, territory_codes in users:
+        if sales_hierarchy_level:
+            hierarchy_info = f"{sales_hierarchy_level}: "
+            if nsm_code:
+                hierarchy_info += nsm_code
+            elif zsm_code:
+                hierarchy_info += zsm_code
+            elif asm_code:
+                hierarchy_info += asm_code
+            elif so_code:
+                hierarchy_info += so_code
+            print(f"{username:<20} {role:<10} {hierarchy_info}")
+    print("="*90)
 
 
 if __name__ == "__main__":

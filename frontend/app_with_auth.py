@@ -440,13 +440,22 @@ def process_query():
                 'error': f'Validation errors: {", ".join(errors)}'
             })
 
-        # Apply security (RLS based on user role)
+        # Apply security (RLS based on user's actual hierarchy)
+        # Admin/analyst/NSM get national access; ZSM/ASM/SO get filtered access
+        hierarchy_restricted_roles = {'SO', 'ASM', 'ZSM'}
+        access_level = 'territory' if current_user.role in hierarchy_restricted_roles else 'national'
+
         user_context = UserContext(
             user_id=current_user.username,
             role=current_user.role,
-            data_access_level='national',  # Can be customized per user
+            data_access_level=access_level,
             states=[],
-            regions=[]
+            regions=[],
+            sales_hierarchy_level=current_user.sales_hierarchy_level,
+            so_codes=[current_user.so_code] if current_user.so_code else [],
+            asm_codes=[current_user.asm_code] if current_user.asm_code else [],
+            zsm_codes=[current_user.zsm_code] if current_user.zsm_code else [],
+            nsm_codes=[current_user.nsm_code] if current_user.nsm_code else [],
         )
         secured_query = RowLevelSecurity.apply_security(semantic_query, user_context)
 
@@ -616,9 +625,14 @@ if __name__ == '__main__':
     print("Open your browser and go to: http://localhost:5000")
     print("")
     print("Login with one of the sample users:")
-    print("  - nestle_admin / nestle123")
-    print("  - unilever_admin / unilever123")
-    print("  - itc_admin / itc123")
+    print("  - nestle_admin   / admin123")
+    print("  - unilever_admin / admin123")
+    print("  - itc_admin      / admin123")
+    print("  - nestle_analyst / analyst123")
+    print("  - nsm_rajesh     / nsm123  (NSM - full access)")
+    print("  - zsm_amit       / zsm123  (ZSM - zone filtered)")
+    print("  - asm_rahul      / asm123  (ASM - area filtered)")
+    print("  - so_field1      / so123   (SO  - territory filtered)")
     print("")
     print("Press Ctrl+C to stop the server")
     print("="*60)

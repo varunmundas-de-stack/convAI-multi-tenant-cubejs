@@ -157,6 +157,34 @@ metrics:
     filters:
       - "return_flag = false"
 
+  total_weight_kg:
+    description: "Total weight in kilograms"
+    sql: "SUM(total_weight)"
+    table: "fact_secondary_sales"
+    aggregation: "sum"
+    format: "number"
+    filters:
+      - "return_flag = false"
+
+  total_volume_liters:
+    description: "Total volume in liters"
+    sql: "SUM(total_volume)"
+    table: "fact_secondary_sales"
+    aggregation: "sum"
+    format: "number"
+    filters:
+      - "return_flag = false"
+
+  average_unit_weight:
+    description: "Average unit weight in kg"
+    sql: "AVG(unit_weight)"
+    table: "fact_secondary_sales"
+    aggregation: "avg"
+    format: "number"
+    filters:
+      - "return_flag = false"
+      - "unit_weight > 0"
+
 # Define dimensions for grouping and filtering
 dimensions:
   date:
@@ -193,6 +221,8 @@ dimensions:
       brand_code: "brand_code"
       category_name: "category_name"
       category_code: "category_code"
+      subcategory_code: "subcategory_code"
+      subcategory_name: "subcategory_name"
       division_name: "division_name"
       manufacturer_name: "manufacturer_name"
       pack_size: "pack_size"
@@ -205,6 +235,7 @@ dimensions:
       - manufacturer_name
       - division_name
       - category_name
+      - subcategory_name
       - brand_name
       - sku_name
 
@@ -254,6 +285,30 @@ dimensions:
       channel_code: "channel_code"
       channel_name: "channel_name"
       channel_category: "channel_category"
+
+  sales_hierarchy:
+    table: "dim_sales_hierarchy"
+    key: "sales_hierarchy_key"
+    attributes:
+      so_code: "so_code"
+      so_name: "so_name"
+      asm_code: "asm_code"
+      asm_name: "asm_name"
+      zsm_code: "zsm_code"
+      zsm_name: "zsm_name"
+      nsm_code: "nsm_code"
+      nsm_name: "nsm_name"
+      territory_code: "territory_code"
+      territory_name: "territory_name"
+      region_code: "region_code"
+      region_name: "region_name"
+      zone_code: "zone_code"
+      zone_name: "zone_name"
+    hierarchy:
+      - nsm_name
+      - zsm_name
+      - asm_name
+      - so_name
 
 # Define common business terms and their mappings
 business_terms:
@@ -370,6 +425,7 @@ fact_tables:
       - "geography"
       - "customer"
       - "channel"
+      - "sales_hierarchy"
     measures:
       - "invoice_value"
       - "invoice_quantity"
@@ -377,6 +433,8 @@ fact_tables:
       - "discount_amount"
       - "margin_amount"
       - "return_amount"
+      - "total_weight"
+      - "total_volume"
     time_dimension: "invoice_date"
     grain: "invoice_line"
 

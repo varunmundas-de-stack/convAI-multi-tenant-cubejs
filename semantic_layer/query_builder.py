@@ -6,7 +6,7 @@ from semantic_layer.schemas import SemanticQuery, Filter, IntentType
 from semantic_layer.ast_builder import (
     Query, SelectClause, FromClause, JoinClause, WhereClause,
     GroupByClause, OrderByClause, LimitClause,
-    ColumnRef, AggregateExpr, BinaryExpr, Literal
+    ColumnRef, AggregateExpr, BinaryExpr, Literal, RawSQLExpr
 )
 
 
@@ -150,10 +150,7 @@ class ASTQueryBuilder:
         """Build JOIN clauses for dimensions"""
         joins = []
 
-        # Get dimension tables needed
-        dimensions_used = semantic_query.dimensionality.group_by
-
-        # Map dimension to table
+        # Map dimension/filter column to base table name
         dimension_tables = {
             'date': 'dim_date',
             'year': 'dim_date',
@@ -178,24 +175,46 @@ class ASTQueryBuilder:
             'distributor_name': 'dim_customer',
             'retailer_name': 'dim_customer',
             'outlet_type': 'dim_customer',
-            'channel_name': 'dim_channel'
+            'channel_name': 'dim_channel',
+            # Sales hierarchy columns
+            'so_code': 'dim_sales_hierarchy',
+            'so_name': 'dim_sales_hierarchy',
+            'asm_code': 'dim_sales_hierarchy',
+            'asm_name': 'dim_sales_hierarchy',
+            'zsm_code': 'dim_sales_hierarchy',
+            'zsm_name': 'dim_sales_hierarchy',
+            'nsm_code': 'dim_sales_hierarchy',
+            'nsm_name': 'dim_sales_hierarchy',
+            'territory_code': 'dim_sales_hierarchy',
+            'territory_name': 'dim_sales_hierarchy',
         }
 
         # Track joined tables to avoid duplicates
         joined_tables = set()
 
-        for dim in dimensions_used:
+        # Collect all columns that need joins: from group_by AND from filters
+        cols_needing_joins = list(semantic_query.dimensionality.group_by)
+        for filter_obj in semantic_query.filters:
+            cols_needing_joins.append(filter_obj.dimension)
+
+        # Derive schema prefix from metric's fact table (e.g. "client_nestle")
+        metric_table = metric.get('table', '')
+        schema_prefix = metric_table.rsplit('.', 1)[0] if '.' in metric_table else ''
+
+        for dim in cols_needing_joins:
             base_table = dimension_tables.get(dim)
             if base_table and base_table not in joined_tables:
                 # Get the qualified table name from semantic layer
-                # by finding which dimension has this table
                 qualified_table = base_table  # fallback to base name
                 for dim_name, dimension in self.semantic_layer.dimensions.items():
-                    # Check if this dimension's table matches (extract base name)
                     dim_base_table = dimension.table.split('.')[-1] if '.' in dimension.table else dimension.table
                     if dim_base_table == base_table:
                         qualified_table = dimension.table  # Use fully qualified name
                         break
+
+                # If still unqualified and we have a schema prefix, apply it
+                if qualified_table == base_table and schema_prefix:
+                    qualified_table = f"{schema_prefix}.{base_table}"
 
                 # Create join with qualified table name
                 join = self._create_dimension_join(qualified_table)
@@ -233,7 +252,12 @@ class ASTQueryBuilder:
                 left=ColumnRef(column="channel_key", table="f"),
                 operator="=",
                 right=ColumnRef(column="channel_key", table="ch")
-            )
+            ),
+            'dim_sales_hierarchy': BinaryExpr(
+                left=ColumnRef(column="sales_hierarchy_key", table="f"),
+                operator="=",
+                right=ColumnRef(column="sales_hierarchy_key", table="sh")
+            ),
         }
 
         # Map table to alias
@@ -242,7 +266,8 @@ class ASTQueryBuilder:
             'dim_product': 'p',
             'dim_geography': 'g',
             'dim_customer': 'c',
-            'dim_channel': 'ch'
+            'dim_channel': 'ch',
+            'dim_sales_hierarchy': 'sh',
         }
 
         # Extract base table name (handle schema-qualified names like client_nestle.dim_product)
@@ -333,25 +358,30 @@ class ASTQueryBuilder:
                 right=Literal(value=filter_obj.values[0])
             )
 
-    def _build_time_filter(self, time_context) -> Optional[BinaryExpr]:
-        """Build time filter condition"""
-        window = time_context.window
+    def _build_time_filter(self, time_context) -> Optional[RawSQLExpr]:
+        """Build time filter condition using invoice_date on the fact table"""
+        window = time_context.window if time_context else None
+        if not window:
+            return None
 
-        # Map window to SQL condition
+        # All filters use f.invoice_date directly (avoids dependency on dim_date join)
         time_filters = {
-            'last_4_weeks': "d.date >= CURRENT_DATE - INTERVAL '4 weeks'",
-            'last_6_weeks': "d.date >= CURRENT_DATE - INTERVAL '6 weeks'",
-            'last_12_weeks': "d.date >= CURRENT_DATE - INTERVAL '12 weeks'",
-            'mtd': "d.month = MONTH(CURRENT_DATE) AND d.year = YEAR(CURRENT_DATE)",
-            'qtd': "d.quarter = QUARTER(CURRENT_DATE) AND d.year = YEAR(CURRENT_DATE)",
-            'ytd': "d.year = YEAR(CURRENT_DATE)",
-            'this_month': "d.month = MONTH(CURRENT_DATE) AND d.year = YEAR(CURRENT_DATE)",
-            'last_month': "d.month = MONTH(CURRENT_DATE - INTERVAL '1 month') AND d.year = YEAR(CURRENT_DATE - INTERVAL '1 month')"
+            'last_4_weeks':  "f.invoice_date >= CURRENT_DATE - INTERVAL 28 DAY",
+            'last_6_weeks':  "f.invoice_date >= CURRENT_DATE - INTERVAL 42 DAY",
+            'last_12_weeks': "f.invoice_date >= CURRENT_DATE - INTERVAL 84 DAY",
+            'this_month':    "EXTRACT(MONTH FROM f.invoice_date) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM f.invoice_date) = EXTRACT(YEAR FROM CURRENT_DATE)",
+            'mtd':           "EXTRACT(MONTH FROM f.invoice_date) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM f.invoice_date) = EXTRACT(YEAR FROM CURRENT_DATE)",
+            'last_month':    "EXTRACT(MONTH FROM f.invoice_date) = EXTRACT(MONTH FROM CURRENT_DATE - INTERVAL 1 MONTH) AND EXTRACT(YEAR FROM f.invoice_date) = EXTRACT(YEAR FROM CURRENT_DATE - INTERVAL 1 MONTH)",
+            'qtd':           "EXTRACT(QUARTER FROM f.invoice_date) = EXTRACT(QUARTER FROM CURRENT_DATE) AND EXTRACT(YEAR FROM f.invoice_date) = EXTRACT(YEAR FROM CURRENT_DATE)",
+            'ytd':           "EXTRACT(YEAR FROM f.invoice_date) = EXTRACT(YEAR FROM CURRENT_DATE)",
+            'this_year':     "EXTRACT(YEAR FROM f.invoice_date) = EXTRACT(YEAR FROM CURRENT_DATE)",
+            'last_year':     "EXTRACT(YEAR FROM f.invoice_date) = EXTRACT(YEAR FROM CURRENT_DATE) - 1",
         }
 
-        # For simplicity, return raw SQL string for complex time filters
-        # TODO: Parse into proper AST
-        return None  # Let semantic_layer handle time filters in WHERE clause
+        sql = time_filters.get(window)
+        if sql:
+            return RawSQLExpr(sql=sql)
+        return None
 
     def _build_group_by(self, semantic_query: SemanticQuery) -> Optional[GroupByClause]:
         """Build GROUP BY clause"""
@@ -440,7 +470,19 @@ class ASTQueryBuilder:
             'outlet_type': 'c.outlet_type',
 
             # Channel dimensions
-            'channel_name': 'ch.channel_name'
+            'channel_name': 'ch.channel_name',
+
+            # Sales Hierarchy dimensions
+            'so_code': 'sh.so_code',
+            'so_name': 'sh.so_name',
+            'asm_code': 'sh.asm_code',
+            'asm_name': 'sh.asm_name',
+            'zsm_code': 'sh.zsm_code',
+            'zsm_name': 'sh.zsm_name',
+            'nsm_code': 'sh.nsm_code',
+            'nsm_name': 'sh.nsm_name',
+            'territory_code': 'sh.territory_code',
+            'territory_name': 'sh.territory_name',
         }
 
         return dimension_mapping.get(dim_name)

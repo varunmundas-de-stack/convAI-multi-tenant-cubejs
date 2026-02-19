@@ -105,6 +105,31 @@
             transform: scale(1.05);
         }
 
+        .dashboard-button {
+            position: absolute;
+            top: 20px;
+            right: 120px;
+            background: rgba(255, 255, 255, 0.3);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            backdrop-filter: blur(10px);
+        }
+
+        .dashboard-button:hover {
+            background: rgba(255, 255, 255, 0.4);
+            transform: scale(1.05);
+        }
+
+        .dashboard-button::before {
+            content: "📊 ";
+        }
+
         .chat-messages {
             flex: 1;
             overflow-y: auto;
@@ -519,6 +544,7 @@
 <body>
     <div class="chat-container">
         <div class="chat-header">
+            <button class="dashboard-button" onclick="openDashboard()">Dashboard</button>
             <button class="logout-button" onclick="logout()">Logout</button>
             <h1>CPG Analytics Chatbot</h1>
             <p>Ask questions about sales, distribution, and market insights</p>
@@ -780,6 +806,11 @@
             if (confirm('Are you sure you want to logout?')) {
                 window.location.href = '/logout';
             }
+        }
+
+        function openDashboard() {
+            // Open Metabase in new tab
+            window.open('http://localhost:3000', '_blank');
         }
 
         // Handle clicking on clarification options

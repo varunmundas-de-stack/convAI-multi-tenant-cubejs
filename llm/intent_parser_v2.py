@@ -28,6 +28,7 @@ class IntentParserV2:
     Enhanced intent parser that outputs SemanticQuery.
     Supports both Ollama (dev/local) and Claude API (prod).
     """
+    _llm_unavailable_warned = False  # print LLM-unavailable warning only once
 
     def __init__(
         self,
@@ -88,7 +89,9 @@ class IntentParserV2:
             else:
                 return self._parse_with_ollama(question)
         except Exception as e:
-            print(f"LLM parsing failed: {e}, using fallback")
+            if not IntentParserV2._llm_unavailable_warned:
+                print(f"LLM unavailable ({e}). Using rule-based fallback for all queries.")
+                IntentParserV2._llm_unavailable_warned = True
             return self._fallback_parse(question)
 
     def _parse_with_ollama(self, question: str) -> SemanticQuery:
