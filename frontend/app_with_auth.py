@@ -43,8 +43,11 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'  # Redirect to login page if not authenticated
 login_manager.session_protection = "strong"  # Prevent session hijacking
 
-# Initialize auth manager
-auth_manager = AuthManager("database/users.db")
+# Absolute project root — resolves paths correctly regardless of working directory
+_APP_ROOT = Path(__file__).parent.parent
+
+# Initialize auth manager with absolute path
+auth_manager = AuthManager(str(_APP_ROOT / 'database' / 'users.db'))
 
 # Cache for client-specific components (avoid recreating for each request)
 client_components = {}
@@ -59,8 +62,7 @@ TENANT_SCHEMAS = {
     'itc':      'client_itc',
 }
 
-# Initialize hierarchy insights engine
-_APP_ROOT = Path(__file__).parent.parent
+# Initialize hierarchy insights engine with absolute paths
 insights_engine = HierarchyInsightsEngine(
     analytics_db_path=str(_APP_ROOT / 'database' / 'cpg_multi_tenant.duckdb'),
     users_db_path=str(_APP_ROOT / 'database' / 'users.db'),
@@ -88,15 +90,19 @@ def get_client_components(client_id: str):
         if not client_config:
             raise ValueError(f"Client {client_id} not found")
 
+        # Resolve stored relative paths against project root
+        config_path   = str(_APP_ROOT / client_config['config_path'])
+        database_path = str(_APP_ROOT / client_config['database_path'])
+
         # Initialize semantic layer for this client
         semantic_layer = SemanticLayer(
-            config_path=client_config['config_path'],
+            config_path=config_path,
             client_id=client_id
         )
 
         intent_parser = IntentParserV2(semantic_layer, use_claude=False)
         validator = SemanticValidator(semantic_layer)
-        executor = QueryExecutor(client_config['database_path'])
+        executor = QueryExecutor(database_path)
         orchestrator = QueryOrchestrator(semantic_layer, executor)
 
         client_components[client_id] = {
