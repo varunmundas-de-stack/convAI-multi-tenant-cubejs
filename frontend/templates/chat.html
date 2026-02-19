@@ -540,115 +540,105 @@
             }
         }
 
-        /* ---- Insights bell button ---- */
-        .insights-button {
-            position: absolute;
-            top: 20px;
-            right: 250px;
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            backdrop-filter: blur(10px);
-        }
-
-        .insights-button:hover {
-            background: rgba(255, 255, 255, 0.35);
-            transform: scale(1.05);
-        }
-
-        .insights-badge {
-            position: absolute;
-            top: -7px;
-            right: -7px;
-            background: #ff4444;
-            color: white;
-            border-radius: 50%;
-            width: 18px;
-            height: 18px;
-            font-size: 10px;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            line-height: 1;
-        }
-
-        /* ---- Insights slide-in panel ---- */
-        .insights-overlay {
-            display: none;
-            position: fixed;
-            top: 0; right: 0; bottom: 0;
-            width: 380px;
+        /* ---- Two-pillar mode tabs ---- */
+        .mode-tabs {
+            display: flex;
             background: white;
-            box-shadow: -4px 0 24px rgba(0, 0, 0, 0.18);
-            z-index: 1000;
-            flex-direction: column;
-        }
-
-        .insights-overlay.open {
-            display: flex;
-            animation: slideInRight 0.25s ease;
-        }
-
-        @keyframes slideInRight {
-            from { transform: translateX(100%); opacity: 0; }
-            to   { transform: translateX(0);    opacity: 1; }
-        }
-
-        .insights-panel-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 16px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            border-bottom: 2px solid #eee;
             flex-shrink: 0;
         }
 
-        .insights-panel-header h3 {
-            font-size: 16px;
-            font-weight: 700;
-            margin: 0;
-        }
-
-        .insights-panel-subtitle {
-            font-size: 11px;
-            opacity: 0.8;
-            margin-top: 2px;
-        }
-
-        .insights-close {
-            background: rgba(255, 255, 255, 0.25);
+        .mode-tab {
+            flex: 1;
+            background: none;
             border: none;
-            color: white;
-            font-size: 18px;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            padding: 15px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #aaa;
             cursor: pointer;
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
+            transition: color 0.2s, background 0.2s, border-color 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
-            line-height: 1;
-            transition: background 0.15s;
+            gap: 9px;
         }
 
-        .insights-close:hover {
-            background: rgba(255, 255, 255, 0.4);
+        .mode-tab:hover {
+            color: #667eea;
+            background: #f8f8ff;
         }
 
-        .insights-panel-body {
+        .mode-tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .mode-tab-icon { font-size: 17px; }
+
+        .mode-tab-badge {
+            background: #ff4444;
+            color: white;
+            border-radius: 10px;
+            padding: 2px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            min-width: 20px;
+            text-align: center;
+            display: none;
+            line-height: 1.5;
+        }
+
+        /* ---- Insights full-page view ---- */
+        .insights-view {
+            display: none;
             flex: 1;
             overflow-y: auto;
-            padding: 12px;
-            background: #f5f5f5;
+            padding: 20px;
+            background: #f4f5f7;
         }
+
+        .insights-view.active { display: block; }
+
+        .insights-view-inner {
+            max-width: 860px;
+            margin: 0 auto;
+        }
+
+        .insights-view-heading {
+            margin-bottom: 16px;
+        }
+
+        .insights-view-heading h2 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #333;
+            margin: 0 0 3px;
+        }
+
+        .insights-view-heading p {
+            font-size: 12px;
+            color: #999;
+            margin: 0;
+        }
+
+        .insights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+            gap: 12px;
+        }
+
+        /* ---- Chat view wrapper ---- */
+        .chat-view {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .chat-view.hidden { display: none; }
 
         /* ---- Insight cards ---- */
         .insight-card {
@@ -766,14 +756,10 @@
 <body>
     <div class="chat-container">
         <div class="chat-header">
-            <button class="insights-button" id="insightsBtn" onclick="toggleInsightsPanel()">
-                Insights
-                <span class="insights-badge" id="insightsBadge"></span>
-            </button>
             <button class="dashboard-button" onclick="openDashboard()">Dashboard</button>
             <button class="logout-button" onclick="logout()">Logout</button>
-            <h1>CPG Analytics Chatbot</h1>
-            <p>Ask questions about sales, distribution, and market insights</p>
+            <h1>CPG Sales Assistant</h1>
+            <p>Your AI-powered analytics and insights companion</p>
             <div class="user-info">
                 <div class="user-name">{{ user.full_name }}</div>
                 <div class="user-client">
@@ -783,69 +769,80 @@
             </div>
         </div>
 
-        <div class="suggestions" id="suggestions">
-            <div class="suggestions-title">Try asking:</div>
-            <div class="suggestion-chips" id="suggestionChips"></div>
+        <!-- Two-pillar mode tabs -->
+        <div class="mode-tabs">
+            <button class="mode-tab" id="tabInsights" onclick="switchMode('insights')">
+                <span class="mode-tab-icon">&#127919;</span>
+                Targeted Insights
+                <span class="mode-tab-badge" id="tabBadge"></span>
+            </button>
+            <button class="mode-tab" id="tabChat" onclick="switchMode('chat')">
+                <span class="mode-tab-icon">&#128172;</span>
+                Ask your own Q
+            </button>
         </div>
 
-        <div class="chat-messages" id="chatMessages">
-            <div class="message assistant">
-                <div class="message-content">
-                    <p><strong>Hello {{ user.full_name }}! Welcome to {{ client_name }} Analytics.</strong></p>
-
-                    <p style="margin-top: 10px; padding: 12px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px;">
-                        <strong>✅ You CAN ask about:</strong><br>
-                        • {{ client_name }} sales, brands, SKUs, and products<br>
-                        • Distribution channels and customer insights<br>
-                        • Time-based trends and performance metrics<br>
-                        • Diagnostic analysis ("Why did sales change?")
-                    </p>
-
-                    <p style="margin-top: 10px; padding: 12px; background: #ffebee; border-left: 4px solid #f44336; border-radius: 4px;">
-                        <strong>❌ You CANNOT ask about:</strong><br>
-                        • Other companies' data (restricted to {{ client_name }} only)<br>
-                        • Database metadata or schema information<br>
-                        • General knowledge or non-analytics questions<br>
-                        • Data modifications or updates
-                    </p>
-
-                    <p style="margin-top: 10px;"><strong>Try asking questions like:</strong></p>
-                    <ul style="margin-top: 8px; padding-left: 20px;">
-                        <li><strong>Ranking:</strong> "Show top 5 brands by sales value"</li>
-                        <li><strong>Trend:</strong> "Weekly sales trend for last 6 weeks"</li>
-                        <li><strong>Diagnostic:</strong> "Why did sales change?"</li>
-                        <li><strong>Snapshot:</strong> "Total sales this month"</li>
-                        <li><strong>Filters:</strong> "Sales by state in Tamil Nadu"</li>
-                    </ul>
+        <!-- Insights full-page view -->
+        <div class="insights-view" id="insightsView">
+            <div class="insights-view-inner">
+                <div class="insights-view-heading">
+                    <h2>Your Targeted Insights</h2>
+                    <p>Personalised nudges based on your role &amp; territory &mdash; refreshed every 6 hours</p>
+                </div>
+                <div class="insights-grid" id="insightsGrid">
+                    <div class="insights-loading">Loading insights&hellip;</div>
                 </div>
             </div>
         </div>
 
-        <div class="chat-input-container">
-            <div class="chat-input-wrapper">
-                <input
-                    type="text"
-                    id="chatInput"
-                    class="chat-input"
-                    placeholder="Ask a question about your CPG data..."
-                    autocomplete="off"
-                />
-                <button id="sendButton" class="send-button">Send</button>
+        <!-- Chat view (Ask your own Q) -->
+        <div class="chat-view" id="chatView">
+            <div class="suggestions" id="suggestions">
+                <div class="suggestions-title">Try asking:</div>
+                <div class="suggestion-chips" id="suggestionChips"></div>
             </div>
-        </div>
-    </div>
 
-    <!-- Insights slide-in panel -->
-    <div class="insights-overlay" id="insightsPanel">
-        <div class="insights-panel-header">
-            <div>
-                <h3>Targeted Insights</h3>
-                <div class="insights-panel-subtitle">Personalised nudges for your role</div>
+            <div class="chat-messages" id="chatMessages">
+                <div class="message assistant">
+                    <div class="message-content">
+                        <p><strong>Hello {{ user.full_name }}! Welcome to {{ client_name }} Analytics.</strong></p>
+
+                        <p style="margin-top: 10px; padding: 12px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px;">
+                            <strong>&#10003; You CAN ask about:</strong><br>
+                            &bull; {{ client_name }} sales, brands, SKUs, and products<br>
+                            &bull; Distribution channels and customer insights<br>
+                            &bull; Time-based trends and performance metrics<br>
+                            &bull; Diagnostic analysis ("Why did sales change?")
+                        </p>
+
+                        <p style="margin-top: 10px; padding: 12px; background: #ffebee; border-left: 4px solid #f44336; border-radius: 4px;">
+                            <strong>&#10007; You CANNOT ask about:</strong><br>
+                            &bull; Other companies' data (restricted to {{ client_name }} only)<br>
+                            &bull; Database metadata or schema information<br>
+                            &bull; General knowledge or non-analytics questions
+                        </p>
+
+                        <p style="margin-top: 10px;"><strong>Try asking:</strong>
+                            "Show top 5 brands by sales" &nbsp;|&nbsp;
+                            "Weekly sales trend" &nbsp;|&nbsp;
+                            "Why did sales change?"
+                        </p>
+                    </div>
+                </div>
             </div>
-            <button class="insights-close" onclick="toggleInsightsPanel()">&#x2715;</button>
-        </div>
-        <div class="insights-panel-body" id="insightsPanelBody">
-            <div class="insights-loading">Loading insights&hellip;</div>
+
+            <div class="chat-input-container">
+                <div class="chat-input-wrapper">
+                    <input
+                        type="text"
+                        id="chatInput"
+                        class="chat-input"
+                        placeholder="Ask a question about your CPG data..."
+                        autocomplete="off"
+                    />
+                    <button id="sendButton" class="send-button">Send</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1223,67 +1220,77 @@
             return summary;
         }
 
-        // ---- Targeted Insights Panel ---- //
+        // ---- Two-pillar mode switching ---- //
 
-        function toggleInsightsPanel() {
-            const panel = document.getElementById('insightsPanel');
-            if (panel.classList.contains('open')) {
-                panel.classList.remove('open');
-            } else {
-                panel.classList.add('open');
+        // Jinja: does this user have a sales hierarchy level?
+        const hasSalesHierarchy = {{ 'true' if user.sales_hierarchy_level else 'false' }};
+        let currentMode = null;  // set by switchMode() on load
+
+        function switchMode(mode) {
+            currentMode = mode;
+
+            // Update tab active state
+            document.getElementById('tabInsights').classList.toggle('active', mode === 'insights');
+            document.getElementById('tabChat').classList.toggle('active', mode === 'chat');
+
+            // Show/hide content areas
+            document.getElementById('insightsView').classList.toggle('active', mode === 'insights');
+            document.getElementById('chatView').classList.toggle('hidden', mode === 'insights');
+
+            if (mode === 'insights') {
                 loadInsights();
+            } else {
+                chatInput.focus();
             }
         }
 
         function loadInsights() {
-            const body = document.getElementById('insightsPanelBody');
-            body.innerHTML = '<div class="insights-loading">Loading insights&hellip;</div>';
+            const grid = document.getElementById('insightsGrid');
+            grid.innerHTML = '<div class="insights-loading">Loading insights&hellip;</div>';
 
             fetch('/api/insights')
                 .then(res => res.json())
                 .then(data => {
                     const insights = data.insights || [];
                     if (insights.length === 0) {
-                        body.innerHTML = `
-                            <div class="insights-empty">
+                        grid.innerHTML = `
+                            <div class="insights-empty" style="grid-column:1/-1;">
                                 No insights yet.<br>
-                                Insights are generated every 6 hours.<br>
-                                <br>Check back soon!
+                                Insights are generated automatically every 6 hours.<br><br>
+                                In the meantime, use the <strong>Ask your own Q</strong> tab to explore your data.
                             </div>`;
                         return;
                     }
 
-                    body.innerHTML =
+                    grid.innerHTML =
                         insights.map(i => renderInsightCard(i)).join('') +
-                        '<div class="insights-refresh-note">Insights refresh every 6 hours</div>';
+                        '<p class="insights-refresh-note" style="grid-column:1/-1;">Insights refresh every 6 hours</p>';
 
-                    // Attach click handlers via data attributes (safe — no inline eval)
-                    body.querySelectorAll('.insight-card').forEach(card => {
+                    // Attach click handlers (data-attributes — no inline eval)
+                    grid.querySelectorAll('.insight-card').forEach(card => {
                         card.addEventListener('click', () => {
                             useInsight(card.dataset.insightId, card.dataset.query);
                         });
                     });
                 })
                 .catch(() => {
-                    body.innerHTML = '<div class="insights-empty">Could not load insights.<br>Please try again.</div>';
+                    grid.innerHTML = '<div class="insights-empty" style="grid-column:1/-1;">Could not load insights. Please try again.</div>';
                 });
         }
 
         function renderInsightCard(ins) {
-            const unreadClass  = ins.is_read ? '' : 'unread';
+            const unreadClass   = ins.is_read ? '' : 'unread';
             const priorityClass = `priority-${ins.priority}`;
             const typeClass     = `type-${ins.insight_type}`;
             const prioTagClass  = `prio-${ins.priority}`;
 
             const changePart = (ins.metric_change_pct != null)
-                ? ` <span style="color:${ins.metric_change_pct >= 0 ? '#4caf50' : '#f44336'};font-weight:600;">` +
+                ? ` <span style="color:${ins.metric_change_pct >= 0 ? '#4caf50' : '#f44336'};font-weight:700;">` +
                   `${ins.metric_change_pct >= 0 ? '+' : ''}${ins.metric_change_pct.toFixed(1)}%</span>`
                 : '';
 
-            const unreadDot = ins.is_read ? '' : '<div class="unread-dot"></div>';
-
-            // Safely encode the suggested query for use in a data attribute
-            const queryAttr = (ins.suggested_query || '').replace(/"/g, '&quot;');
+            const unreadDot   = ins.is_read ? '' : '<div class="unread-dot"></div>';
+            const queryAttr   = (ins.suggested_query || '').replace(/"/g, '&quot;');
 
             return `
                 <div class="insight-card ${unreadClass} ${priorityClass}"
@@ -1298,7 +1305,7 @@
                     <div class="insight-title">${ins.title}${changePart}</div>
                     <div class="insight-desc">${ins.description}</div>
                     <div class="insight-action">${ins.suggested_action}</div>
-                    <div class="insight-click-hint">Click to explore in chat</div>
+                    <div class="insight-click-hint">Click to explore in the chat tab &#8594;</div>
                 </div>`;
         }
 
@@ -1315,21 +1322,20 @@
                     refreshInsightBadge();
                 });
 
-            // Pre-fill chat and close panel
+            // Pre-fill chat input then switch to chat tab
             chatInput.value = suggestedQuery;
-            toggleInsightsPanel();
-            chatInput.focus();
+            switchMode('chat');
         }
 
         function refreshInsightBadge() {
             fetch('/api/insights/count')
                 .then(res => res.json())
                 .then(data => {
-                    const badge = document.getElementById('insightsBadge');
+                    const badge = document.getElementById('tabBadge');
                     const count = data.unread_count || 0;
                     if (count > 0) {
                         badge.textContent = count > 9 ? '9+' : String(count);
-                        badge.style.display = 'flex';
+                        badge.style.display = 'inline-block';
                     } else {
                         badge.style.display = 'none';
                     }
@@ -1337,12 +1343,12 @@
                 .catch(() => {});
         }
 
-        // Initial badge load + poll every 30 seconds
+        // Default to Insights tab for sales hierarchy users, Chat for everyone else
+        switchMode(hasSalesHierarchy ? 'insights' : 'chat');
+
+        // Poll badge count every 30 seconds
         refreshInsightBadge();
         setInterval(refreshInsightBadge, 30000);
-
-        // Focus input on load
-        chatInput.focus();
     </script>
 </body>
 </html>
