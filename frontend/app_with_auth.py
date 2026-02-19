@@ -80,10 +80,6 @@ def _insights_generation_loop():
         time.sleep(6 * 3600)  # refresh every 6 hours
 
 
-_insights_thread = threading.Thread(target=_insights_generation_loop, daemon=True)
-_insights_thread.start()
-
-
 def get_client_components(client_id: str):
     """Get or create client-specific components"""
     if client_id not in client_components:
@@ -711,4 +707,11 @@ if __name__ == '__main__':
     print("Press Ctrl+C to stop the server")
     print("="*60)
 
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Start insights background thread here (not at module level) to avoid
+    # a GIL conflict with Werkzeug's debug reloader forking the process.
+    _insights_thread = threading.Thread(target=_insights_generation_loop, daemon=True)
+    _insights_thread.start()
+
+    # use_reloader=False prevents Werkzeug from forking a child process,
+    # which would conflict with DuckDB releasing the GIL in the background thread.
+    app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)
