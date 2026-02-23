@@ -73,8 +73,9 @@ export default function ChatTab({ user, sessionId, onSessionCreated, prefillQuer
   }
 
   // ── Send ───────────────────────────────────────────────────────
-  const handleSend = async () => {
-    const q = input.trim()
+  // directQuery: pass a string to send immediately (used by suggestion chips)
+  const handleSend = async (directQuery = null) => {
+    const q = directQuery ? directQuery.trim() : input.trim()
     if (!q || loading) return
 
     const tempId = `tmp-${Date.now()}`
@@ -125,7 +126,7 @@ export default function ChatTab({ user, sessionId, onSessionCreated, prefillQuer
             {suggestions.map((s, i) => (
               <button
                 key={i}
-                onClick={() => { setInput(s); inputRef.current?.focus() }}
+                onClick={() => handleSend(s)}
                 className="text-xs bg-gray-100 hover:bg-brand-500 hover:text-white px-3 py-1.5 rounded-full transition-colors font-medium text-gray-600"
               >
                 {s}

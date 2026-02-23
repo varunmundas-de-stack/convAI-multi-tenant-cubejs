@@ -117,7 +117,6 @@ export default function SessionSidebar({ activeSessionId, onSelect, onNew, isOpe
 }
 
 function SessionItem({ session, isActive, onClick, onDelete, onRename }) {
-  const [hovered, setHovered]   = useState(false)
   const [editing, setEditing]   = useState(false)
   const [draft, setDraft]       = useState(session.title)
   const inputRef = useRef(null)
@@ -159,8 +158,6 @@ function SessionItem({ session, isActive, onClick, onDelete, onRename }) {
   return (
     <div
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       className={`
         group flex items-center justify-between px-3 py-2 mx-1 rounded-lg cursor-pointer
         text-sm transition-colors
@@ -168,32 +165,32 @@ function SessionItem({ session, isActive, onClick, onDelete, onRename }) {
       `}
     >
       <span className="truncate flex-1 leading-tight">{session.title}</span>
-      {(hovered || isActive) && (
-        <div className="flex items-center gap-0.5 flex-shrink-0 ml-1">
-          {/* Pencil / rename */}
-          <button
-            onClick={startEdit}
-            title="Rename"
-            className="p-0.5 rounded hover:bg-white/20 text-white/40 hover:text-white"
-          >
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-          </button>
-          {/* Trash / delete */}
-          <button
-            onClick={onDelete}
-            title="Delete"
-            className="p-0.5 rounded hover:bg-white/20 text-white/40 hover:text-red-400"
-          >
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
-        </div>
-      )}
+      {/* Action buttons — always in DOM, visible on hover or when active */}
+      <div className={`flex items-center gap-0.5 flex-shrink-0 ml-1 transition-opacity
+        ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+        {/* Pencil / rename */}
+        <button
+          onClick={startEdit}
+          title="Rename"
+          className="p-0.5 rounded hover:bg-white/20 text-white/40 hover:text-white"
+        >
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+        </button>
+        {/* Trash / delete */}
+        <button
+          onClick={onDelete}
+          title="Delete"
+          className="p-0.5 rounded hover:bg-white/20 text-white/40 hover:text-red-400"
+        >
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
+      </div>
     </div>
   )
 }
