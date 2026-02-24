@@ -3,22 +3,28 @@ import { useNavigate } from 'react-router-dom'
 import Header from '../components/Header'
 import InsightsTab from '../components/InsightsTab'
 import ChatTab from '../components/ChatTab'
+import DashboardTab from '../components/DashboardTab'
 import SessionSidebar from '../components/SessionSidebar'
 import { fetchInsightCount, logoutUser } from '../api/client'
 
+const TABS = [
+  { id: 'dashboard', label: 'Dashboard',     icon: '📊' },
+  { id: 'insights',  label: 'Insights',       icon: '🎯' },
+  { id: 'chat',      label: 'Ask your own Q', icon: '💬' },
+]
+
 export default function DashboardPage({ user, onLogout }) {
   const navigate = useNavigate()
-  const hasSalesHierarchy = Boolean(user?.sales_hierarchy_level)
-  const [activeTab, setActiveTab]         = useState(hasSalesHierarchy ? 'insights' : 'chat')
-  const [unreadCount, setUnreadCount]     = useState(0)
-  const [sidebarOpen, setSidebarOpen]     = useState(false)
+  const [activeTab, setActiveTab]             = useState('dashboard')
+  const [unreadCount, setUnreadCount]         = useState(0)
+  const [sidebarOpen, setSidebarOpen]         = useState(false)
   const [activeSessionId, setActiveSessionId] = useState(null)
-  const [prefillQuery, setPrefillQuery]   = useState(null)
+  const [prefillQuery, setPrefillQuery]       = useState(null)
 
   useEffect(() => {
     refreshBadge()
-    const interval = setInterval(refreshBadge, 30000)
-    return () => clearInterval(interval)
+    const id = setInterval(refreshBadge, 30_000)
+    return () => clearInterval(id)
   }, [])
 
   const refreshBadge = async () => {
@@ -43,33 +49,31 @@ export default function DashboardPage({ user, onLogout }) {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col h-screen" style={{ background: 'transparent' }}>
       <Header
         user={user}
         onLogout={handleLogout}
         onMenuToggle={() => setSidebarOpen(v => !v)}
       />
 
-      {/* Tab bar */}
-      <div className="flex bg-white border-b border-gray-200 flex-shrink-0">
-        <TabButton
-          active={activeTab === 'insights'}
-          onClick={() => setActiveTab('insights')}
-          icon="🎯"
-          label="Targeted Insights"
-          badge={unreadCount}
-        />
-        <TabButton
-          active={activeTab === 'chat'}
-          onClick={() => setActiveTab('chat')}
-          icon="💬"
-          label="Ask your own Q"
-        />
+      {/* ── Segmented tab bar ──────────────────────────────────────── */}
+      <div className="flex-shrink-0 px-4 py-2 bg-white/60 backdrop-blur-xl border-b border-white/80"
+           style={{ boxShadow: '0 1px 0 rgba(99,102,241,0.06)' }}>
+        <div className="flex items-center bg-black/[0.04] rounded-2xl p-1 gap-1">
+          {TABS.map(tab => (
+            <TabPill
+              key={tab.id}
+              tab={tab}
+              active={activeTab === tab.id}
+              badge={tab.id === 'insights' ? unreadCount : 0}
+              onClick={() => setActiveTab(tab.id)}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* Main content area */}
+      {/* ── Content ────────────────────────────────────────────────── */}
       <div className="flex flex-1 min-h-0">
-        {/* Session sidebar — only shows on Chat tab */}
         {activeTab === 'chat' && (
           <SessionSidebar
             activeSessionId={activeSessionId}
@@ -80,39 +84,45 @@ export default function DashboardPage({ user, onLogout }) {
           />
         )}
 
-        {/* Content pane */}
-        <div className="flex-1 min-w-0">
-          {activeTab === 'insights'
-            ? <InsightsTab user={user} onBadgeRefresh={refreshBadge} onAskQuery={handleInsightQuery} />
-            : <ChatTab
-                key={activeSessionId}
-                user={user}
-                sessionId={activeSessionId}
-                onSessionCreated={setActiveSessionId}
-                prefillQuery={prefillQuery}
-                onPrefillConsumed={() => setPrefillQuery(null)}
-              />
-          }
+        <div key={activeTab} className="flex-1 min-w-0 animate-fade-in">
+          {activeTab === 'dashboard' && <DashboardTab user={user} />}
+          {activeTab === 'insights'  && (
+            <InsightsTab user={user} onBadgeRefresh={refreshBadge} onAskQuery={handleInsightQuery} />
+          )}
+          {activeTab === 'chat' && (
+            <ChatTab
+              key={activeSessionId}
+              user={user}
+              sessionId={activeSessionId}
+              onSessionCreated={setActiveSessionId}
+              prefillQuery={prefillQuery}
+              onPrefillConsumed={() => setPrefillQuery(null)}
+            />
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-function TabButton({ active, onClick, icon, label, badge }) {
+function TabPill({ tab, active, badge, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`flex-1 flex items-center justify-center gap-2 py-3.5 px-5 text-sm font-semibold border-b-2 transition-colors
+      className={`
+        flex-1 flex items-center justify-center gap-1.5
+        py-2 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold
+        transition-all duration-200 relative
         ${active
-          ? 'text-brand-500 border-brand-500 bg-brand-50'
-          : 'text-gray-400 border-transparent hover:text-brand-500 hover:bg-gray-50'
-        }`}
+          ? 'bg-white text-brand-600 shadow-sm'
+          : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
+        }
+      `}
     >
-      <span className="text-base">{icon}</span>
-      <span>{label}</span>
+      <span className="text-sm">{tab.icon}</span>
+      <span className="truncate hidden xs:inline sm:inline">{tab.label}</span>
       {badge > 0 && (
-        <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
+        <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full min-w-[16px] text-center leading-none flex-shrink-0">
           {badge > 9 ? '9+' : badge}
         </span>
       )}

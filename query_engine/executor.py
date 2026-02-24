@@ -2,6 +2,7 @@
 Query Executor - Executes SQL queries against DuckDB
 """
 import duckdb
+import threading
 import time
 import decimal
 from typing import List, Dict, Any
@@ -14,33 +15,36 @@ class QueryExecutor:
 
     def __init__(self, db_path: str):
         self.db_path = Path(db_path)
-        self.conn = None
+        self._local = threading.local()  # one connection per thread — thread-safe
 
-    def connect(self):
-        """Connect to DuckDB database"""
+    def _get_conn(self):
+        """Return (or lazily open) the per-thread DuckDB connection."""
         if not self.db_path.exists():
             raise FileNotFoundError(f"Database not found: {self.db_path}")
+        conn = getattr(self._local, 'conn', None)
+        if conn is None:
+            conn = duckdb.connect(str(self.db_path), read_only=True)
+            self._local.conn = conn
+        return conn
 
-        self.conn = duckdb.connect(str(self.db_path), read_only=True)
+    # ── kept for backward-compat (context-manager usage) ──────────────────
+    def connect(self):
+        self._get_conn()
 
     def disconnect(self):
-        """Close database connection"""
-        if self.conn:
-            self.conn.close()
-            self.conn = None
+        conn = getattr(self._local, 'conn', None)
+        if conn:
+            conn.close()
+            self._local.conn = None
 
     def execute(self, sql: str) -> QueryResult:
         """
         Execute SQL query and return results
         """
-        if not self.conn:
-            self.connect()
-
         start_time = time.time()
 
         try:
-            # Execute query
-            result = self.conn.execute(sql)
+            result = self._get_conn().execute(sql)
 
             # Fetch all results
             rows = result.fetchall()

@@ -90,3 +90,5 @@ package-lock.json
 # Cube.js specific
 cubejs_project/.cubestore/
 cubejs_project/node_modules/
+frontend/static/react/
+test_nestle_admin.py

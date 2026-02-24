@@ -1,12 +1,14 @@
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, BarElement, LineElement, PointElement,
+  ArcElement,
   Title, Tooltip, Legend, Filler,
 } from 'chart.js'
-import { Bar, Line } from 'react-chartjs-2'
+import { Bar, Line, Doughnut } from 'react-chartjs-2'
 
 ChartJS.register(
   CategoryScale, LinearScale, BarElement, LineElement, PointElement,
+  ArcElement,
   Title, Tooltip, Legend, Filler,
 )
 
@@ -21,7 +23,7 @@ const PALETTE = [
   { bg: 'rgba(255,206,86,0.7)',  border: '#ffce56' },
 ]
 
-export default function DataChart({ data }) {
+export default function DataChart({ data, chartType }) {
   if (!data?.length || data.length < 2) return null
 
   const cols  = Object.keys(data[0])
@@ -33,7 +35,48 @@ export default function DataChart({ data }) {
 
   const labels = data.map(r => String(r[label]))
   const values = data.map(r => parseFloat(r[value]) || 0)
-  const isLine = data.length > 10
+
+  // Doughnut chart
+  if (chartType === 'doughnut') {
+    const doughnutData = {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: data.map((_, i) => PALETTE[i % PALETTE.length].bg),
+        borderColor:     data.map((_, i) => PALETTE[i % PALETTE.length].border),
+        borderWidth: 2,
+      }],
+    }
+    const doughnutOptions = {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'right',
+          labels: { font: { size: 11 }, padding: 8 },
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const v = ctx.parsed
+              return ` ${ctx.label}: ${v >= 1_000_000
+                ? `${(v / 1_000_000).toFixed(1)}M`
+                : v >= 1_000 ? `${(v / 1_000).toFixed(1)}K` : v}`
+            },
+          },
+        },
+      },
+    }
+    return (
+      <div className="mt-3 bg-gray-50 rounded-lg p-3 border border-gray-100">
+        <Doughnut data={doughnutData} options={doughnutOptions} />
+      </div>
+    )
+  }
+
+  // Auto-detect bar vs line
+  const isLine = chartType === 'line' || (chartType === undefined && data.length > 10)
 
   const bgColors     = isLine ? PALETTE[0].bg     : data.map((_, i) => PALETTE[i % PALETTE.length].bg)
   const borderColors = isLine ? PALETTE[0].border  : data.map((_, i) => PALETTE[i % PALETTE.length].border)

@@ -1,0 +1,28 @@
+version: '3.9'
+
+# Production docker-compose — NO Ollama, uses Claude API
+# Usage: docker-compose -f docker-compose.prod.yml up -d --build
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: cpg_sales_assistant
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - ../database:/app/database
+      - ../semantic_layer/configs:/app/semantic_layer/configs
+    environment:
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY}
+      - USE_CLAUDE_API=true
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANONYMIZE_SCHEMA=${ANONYMIZE_SCHEMA:-false}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

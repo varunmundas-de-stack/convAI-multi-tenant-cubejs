@@ -70,6 +70,26 @@ class IntentParserV2:
         else:
             self.claude_client = None
 
+    # Keyword-to-metric overrides applied after LLM parsing to correct hallucinations
+    _METRIC_KEYWORD_OVERRIDES = [
+        (['discount', 'rebate'],           'discount_amount'),
+        (['margin', 'profit'],             'margin_amount'),
+        (['gross sales', 'gross value'],   'gross_sales_value'),
+        (['volume', 'units', 'quantity'],  'secondary_sales_volume'),
+        (['invoice', 'bills'],             'invoice_count'),
+    ]
+
+    def _apply_metric_overrides(self, query: 'SemanticQuery', question: str) -> 'SemanticQuery':
+        """Correct LLM metric hallucinations using keyword matching."""
+        q = question.lower()
+        for keywords, metric in self._METRIC_KEYWORD_OVERRIDES:
+            if any(kw in q for kw in keywords):
+                if query.metric_request and query.metric_request.primary_metric != metric:
+                    print(f"[Override] metric '{query.metric_request.primary_metric}' → '{metric}' for: {question}")
+                    query.metric_request.primary_metric = metric
+                break
+        return query
+
     def parse(self, question: str) -> SemanticQuery:
         """
         Parse user question into SemanticQuery.
@@ -85,9 +105,10 @@ class IntentParserV2:
         """
         try:
             if self.use_claude:
-                return self._parse_with_claude(question)
+                result = self._parse_with_claude(question)
             else:
-                return self._parse_with_ollama(question)
+                result = self._parse_with_ollama(question)
+            return self._apply_metric_overrides(result, question)
         except Exception as e:
             if not IntentParserV2._llm_unavailable_warned:
                 print(f"LLM unavailable ({e}). Using rule-based fallback for all queries.")
@@ -227,6 +248,12 @@ A: {"intent": "ranking", "metric_request": {"primary_metric": "secondary_sales_v
 
 Q: "Compare sales by channel"
 A: {"intent": "comparison", "metric_request": {"primary_metric": "secondary_sales_value"}, "dimensionality": {"group_by": ["channel_name"]}, "time_context": {"window": "last_4_weeks"}}
+
+Q: "What is total discount?"
+A: {"intent": "snapshot", "metric_request": {"primary_metric": "discount_amount"}, "dimensionality": {"group_by": []}, "time_context": {"window": "last_4_weeks"}}
+
+Q: "Show total margin this month"
+A: {"intent": "snapshot", "metric_request": {"primary_metric": "margin_amount"}, "dimensionality": {"group_by": []}, "time_context": {"window": "this_month"}}
 
 Q: "Sales trend by week in Tamil Nadu"
 A: {"intent": "trend", "metric_request": {"primary_metric": "secondary_sales_value"}, "dimensionality": {"group_by": ["week"]}, "time_context": {"window": "last_12_weeks", "grain": "week"}, "filters": [{"dimension": "state_name", "operator": "=", "values": ["Tamil Nadu"]}]}
@@ -373,10 +400,14 @@ Parse into SemanticQuery JSON:"""
         primary_metric = "secondary_sales_value"
         if any(word in question_lower for word in ['volume', 'units', 'quantity']):
             primary_metric = "secondary_sales_volume"
+        elif any(word in question_lower for word in ['discount', 'rebate']):
+            primary_metric = "discount_amount"
         elif any(word in question_lower for word in ['margin', 'profit']):
             primary_metric = "margin_amount"
         elif any(word in question_lower for word in ['invoice', 'bills']):
             primary_metric = "invoice_count"
+        elif any(word in question_lower for word in ['gross']):
+            primary_metric = "gross_sales_value"
 
         # Detect grouping
         group_by = []

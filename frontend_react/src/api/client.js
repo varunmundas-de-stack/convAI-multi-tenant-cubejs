@@ -66,3 +66,8 @@ export async function saveMessage(sessionId, { role, content, raw_data, query_ty
   })
   return data  // { message_id }
 }
+
+export const fetchDashboard = () => api.get('/api/dashboard').then(r => r.data)
+
+export const fetchDrilldown = (drillType, value) =>
+  api.get('/api/dashboard/drilldown', { params: { drill_type: drillType, value } }).then(r => r.data)

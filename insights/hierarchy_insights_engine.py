@@ -658,7 +658,7 @@ class HierarchyInsightsEngine:
         try:
             user_level_idx = level_order.index(hierarchy_level)
         except ValueError:
-            user_level_idx = len(level_order) - 1  # admin/analyst sees all
+            user_level_idx = 0  # admin/analyst sees all levels
 
         visible_levels = level_order[user_level_idx:]  # own level and above
 

@@ -573,7 +573,8 @@ def process_query():
                 'intent': semantic_query.intent.value,
                 'parse_time_ms': round(parse_time, 2),
                 'exec_time_ms': round(exec_time, 2),
-                'confidence': semantic_query.confidence
+                'confidence': semantic_query.confidence,
+                'sql': result.get('sql', '')
             }
         })
 
@@ -595,16 +596,6 @@ def process_query():
 def format_single_query_response(result):
     """Format single query results as HTML"""
     html_parts = []
-
-    # Add SQL query (collapsible)
-    if 'sql' in result:
-        sql_id = f"sqlQuery{int(time.time() * 1000)}"
-        html_parts.append(f"""
-        <div class="sql-section">
-            <button class="sql-toggle" onclick="toggleSQL('{sql_id}')">Show SQL Query</button>
-            <pre class="sql-query" id="{sql_id}" style="display:none;">{result['sql']}</pre>
-        </div>
-        """)
 
     # Add results table
     if 'results' in result and result['results']:
@@ -742,6 +733,259 @@ def mark_insight_read(insight_id):
     """Mark an insight as read for the current user."""
     insights_engine.mark_read(insight_id, current_user.id)
     return jsonify({'success': True})
+
+
+@app.route('/api/dashboard', methods=['GET'])
+@login_required
+def get_dashboard():
+    """Return all chart data for the Dashboard tab in a single call.
+
+    Applies RLS: admin/NSM/analyst get full schema data; SO/ASM/ZSM get
+    filtered by their sales_hierarchy_key rows only.
+    """
+    try:
+        import duckdb
+
+        schema = TENANT_SCHEMAS.get(current_user.client_id)
+        if not schema:
+            return jsonify({'error': 'Unknown client'}), 400
+
+        client_config = auth_manager.get_client_config(current_user.client_id)
+        db_path = str(_APP_ROOT / client_config['database_path'])
+        con = duckdb.connect(db_path, read_only=True)
+
+        # ── Build RLS WHERE clause ────────────────────────────────────────────
+        # Hierarchy-restricted roles filter through dim_sales_hierarchy join
+        hierarchy_restricted = {'SO', 'ASM', 'ZSM'}
+        rls_join  = ''
+        rls_where = ''
+
+        if current_user.role in hierarchy_restricted and current_user.sales_hierarchy_level:
+            lvl = current_user.sales_hierarchy_level
+            if lvl == 'SO' and current_user.so_code:
+                rls_join  = f'JOIN {schema}.dim_sales_hierarchy sh ON f.sales_hierarchy_key = sh.hierarchy_key'
+                rls_where = f"AND sh.so_code = '{current_user.so_code}'"
+            elif lvl == 'ASM' and current_user.asm_code:
+                rls_join  = f'JOIN {schema}.dim_sales_hierarchy sh ON f.sales_hierarchy_key = sh.hierarchy_key'
+                rls_where = f"AND sh.asm_code = '{current_user.asm_code}'"
+            elif lvl == 'ZSM' and current_user.zsm_code:
+                rls_join  = f'JOIN {schema}.dim_sales_hierarchy sh ON f.sales_hierarchy_key = sh.hierarchy_key'
+                rls_where = f"AND sh.zsm_code = '{current_user.zsm_code}'"
+
+        # ── KPIs ─────────────────────────────────────────────────────────────
+        kpi_sql = f"""
+            SELECT
+                COALESCE(SUM(f.net_value), 0)              AS total_sales,
+                COUNT(DISTINCT f.invoice_number)            AS total_invoices
+            FROM {schema}.fact_secondary_sales f
+            {rls_join}
+            WHERE f.invoice_date >= CURRENT_DATE - INTERVAL '30' DAY
+            {rls_where}
+        """
+        kpi_row = con.execute(kpi_sql).fetchone()
+        total_sales    = float(kpi_row[0]) if kpi_row[0] else 0.0
+        total_invoices = int(kpi_row[1])   if kpi_row[1] else 0
+
+        # ── Top Brand ─────────────────────────────────────────────────────────
+        top_brand_sql = f"""
+            SELECT p.brand_name
+            FROM {schema}.fact_secondary_sales f
+            JOIN {schema}.dim_product p ON f.product_key = p.product_key
+            {rls_join}
+            WHERE f.invoice_date >= CURRENT_DATE - INTERVAL '30' DAY
+            {rls_where}
+            GROUP BY p.brand_name ORDER BY SUM(f.net_value) DESC LIMIT 1
+        """
+        tb_row    = con.execute(top_brand_sql).fetchone()
+        top_brand = tb_row[0] if tb_row else 'N/A'
+
+        # ── Top Region ────────────────────────────────────────────────────────
+        top_region_sql = f"""
+            SELECT g.state_name
+            FROM {schema}.fact_secondary_sales f
+            JOIN {schema}.dim_geography g ON f.geography_key = g.geography_key
+            {rls_join}
+            WHERE f.invoice_date >= CURRENT_DATE - INTERVAL '30' DAY
+            {rls_where}
+            GROUP BY g.state_name ORDER BY SUM(f.net_value) DESC LIMIT 1
+        """
+        tr_row     = con.execute(top_region_sql).fetchone()
+        top_region = tr_row[0] if tr_row else 'N/A'
+
+        # ── Sales by Brand (top 8) ────────────────────────────────────────────
+        brand_sql = f"""
+            SELECT p.brand_name, CAST(SUM(f.net_value) AS DOUBLE) AS sales
+            FROM {schema}.fact_secondary_sales f
+            JOIN {schema}.dim_product p ON f.product_key = p.product_key
+            {rls_join}
+            WHERE f.invoice_date >= CURRENT_DATE - INTERVAL '30' DAY
+            {rls_where}
+            GROUP BY p.brand_name ORDER BY 2 DESC LIMIT 8
+        """
+        by_brand = [
+            {'brand_name': r[0], 'sales': float(r[1])}
+            for r in con.execute(brand_sql).fetchall()
+        ]
+
+        # ── Weekly Sales Trend (last 8 weeks) ─────────────────────────────────
+        trend_sql = f"""
+            SELECT
+                DATE_TRUNC('week', f.invoice_date)::VARCHAR AS week,
+                CAST(SUM(f.net_value) AS DOUBLE)            AS sales
+            FROM {schema}.fact_secondary_sales f
+            {rls_join}
+            WHERE f.invoice_date >= CURRENT_DATE - INTERVAL '56' DAY
+            {rls_where}
+            GROUP BY 1 ORDER BY 1
+        """
+        trend = [
+            {'week': r[0][:10], 'sales': float(r[1])}
+            for r in con.execute(trend_sql).fetchall()
+        ]
+
+        # ── Sales by Channel ──────────────────────────────────────────────────
+        channel_sql = f"""
+            SELECT c.channel_name, CAST(SUM(f.net_value) AS DOUBLE) AS sales
+            FROM {schema}.fact_secondary_sales f
+            JOIN {schema}.dim_channel c ON f.channel_key = c.channel_key
+            {rls_join}
+            WHERE f.invoice_date >= CURRENT_DATE - INTERVAL '30' DAY
+            {rls_where}
+            GROUP BY c.channel_name ORDER BY 2 DESC
+        """
+        by_channel = [
+            {'channel_name': r[0], 'sales': float(r[1])}
+            for r in con.execute(channel_sql).fetchall()
+        ]
+
+        con.close()
+
+        return jsonify({
+            'kpis': {
+                'total_sales':    total_sales,
+                'total_invoices': total_invoices,
+                'top_brand':      top_brand,
+                'top_region':     top_region,
+            },
+            'by_brand':   by_brand,
+            'trend':      trend,
+            'by_channel': by_channel,
+        })
+
+    except Exception as e:
+        error_trace = traceback.format_exc()
+        print(f"[Dashboard] Error: {error_trace}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/dashboard/drilldown', methods=['GET'])
+@login_required
+def dashboard_drilldown():
+    """Return detail data for a clicked chart element (brand → SKUs, channel → brands, week → days)."""
+    drill_type = request.args.get('drill_type', '').strip()
+    value      = request.args.get('value', '').strip()
+
+    if not drill_type or not value:
+        return jsonify({'error': 'drill_type and value are required'}), 400
+    if drill_type not in ('brand_skus', 'channel_brands', 'week_days'):
+        return jsonify({'error': 'Invalid drill_type'}), 400
+
+    # Sanitise the incoming value — strip SQL-dangerous chars, keep alphanumeric + common label chars
+    import re as _re
+    if not _re.match(r'^[\w\s\-\.\/:]+$', value):
+        return jsonify({'error': 'Invalid value'}), 400
+    # Escape single quotes for safe f-string interpolation
+    safe_val = value.replace("'", "''")
+
+    try:
+        import duckdb as _duckdb
+
+        schema = TENANT_SCHEMAS.get(current_user.client_id)
+        if not schema:
+            return jsonify({'error': 'Unknown client'}), 400
+
+        client_config = auth_manager.get_client_config(current_user.client_id)
+        db_path = str(_APP_ROOT / client_config['database_path'])
+        con = _duckdb.connect(db_path, read_only=True)
+
+        # ── RLS (same logic as /api/dashboard) ───────────────────────────────
+        hierarchy_restricted = {'SO', 'ASM', 'ZSM'}
+        rls_join  = ''
+        rls_where = ''
+        if current_user.role in hierarchy_restricted and current_user.sales_hierarchy_level:
+            lvl = current_user.sales_hierarchy_level
+            if lvl == 'SO' and current_user.so_code:
+                rls_join  = f'JOIN {schema}.dim_sales_hierarchy sh ON f.sales_hierarchy_key = sh.hierarchy_key'
+                rls_where = f"AND sh.so_code = '{current_user.so_code}'"
+            elif lvl == 'ASM' and current_user.asm_code:
+                rls_join  = f'JOIN {schema}.dim_sales_hierarchy sh ON f.sales_hierarchy_key = sh.hierarchy_key'
+                rls_where = f"AND sh.asm_code = '{current_user.asm_code}'"
+            elif lvl == 'ZSM' and current_user.zsm_code:
+                rls_join  = f'JOIN {schema}.dim_sales_hierarchy sh ON f.sales_hierarchy_key = sh.hierarchy_key'
+                rls_where = f"AND sh.zsm_code = '{current_user.zsm_code}'"
+
+        # ── Queries per drill type ────────────────────────────────────────────
+        if drill_type == 'brand_skus':
+            sql = f"""
+                SELECT p.sku_name                                  AS label,
+                       CAST(SUM(f.net_value)       AS DOUBLE)      AS sales,
+                       COUNT(DISTINCT f.invoice_number)            AS invoices
+                FROM {schema}.fact_secondary_sales f
+                JOIN {schema}.dim_product p ON f.product_key = p.product_key
+                {rls_join}
+                WHERE f.invoice_date >= CURRENT_DATE - INTERVAL '30' DAY
+                  AND p.brand_name = '{safe_val}'
+                {rls_where}
+                GROUP BY p.sku_name ORDER BY 2 DESC LIMIT 10
+            """
+            title = f'{value} — Top SKUs (Last 30 Days)'
+
+        elif drill_type == 'channel_brands':
+            sql = f"""
+                SELECT p.brand_name                                AS label,
+                       CAST(SUM(f.net_value)       AS DOUBLE)      AS sales,
+                       COUNT(DISTINCT f.invoice_number)            AS invoices
+                FROM {schema}.fact_secondary_sales f
+                JOIN {schema}.dim_product  p  ON f.product_key  = p.product_key
+                JOIN {schema}.dim_channel  c  ON f.channel_key  = c.channel_key
+                {rls_join}
+                WHERE f.invoice_date >= CURRENT_DATE - INTERVAL '30' DAY
+                  AND c.channel_name = '{safe_val}'
+                {rls_where}
+                GROUP BY p.brand_name ORDER BY 2 DESC LIMIT 8
+            """
+            title = f'{value} Channel — Brand Breakdown'
+
+        else:  # week_days
+            sql = f"""
+                SELECT CAST(f.invoice_date AS VARCHAR)             AS label,
+                       CAST(SUM(f.net_value)       AS DOUBLE)      AS sales,
+                       COUNT(DISTINCT f.invoice_number)            AS invoices
+                FROM {schema}.fact_secondary_sales f
+                {rls_join}
+                WHERE DATE_TRUNC('week', f.invoice_date) = '{safe_val}'::DATE
+                {rls_where}
+                GROUP BY 1 ORDER BY 1
+            """
+            title = f'Week of {value} — Daily Sales'
+
+        rows  = con.execute(sql).fetchall()
+        total = sum(r[1] for r in rows) or 1
+        items = [
+            {
+                'label':    r[0],
+                'sales':    float(r[1]),
+                'invoices': int(r[2]),
+                'pct':      round(float(r[1]) / total * 100, 1),
+            }
+            for r in rows
+        ]
+        con.close()
+        return jsonify({'title': title, 'items': items})
+
+    except Exception as exc:
+        print(f"[Drilldown] Error: {traceback.format_exc()}")
+        return jsonify({'error': str(exc)}), 500
 
 
 # ─────────────────────────────────────────────────────────────────────────────

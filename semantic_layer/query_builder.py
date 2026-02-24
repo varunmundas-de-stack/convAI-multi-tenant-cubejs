@@ -256,7 +256,7 @@ class ASTQueryBuilder:
             'dim_sales_hierarchy': BinaryExpr(
                 left=ColumnRef(column="sales_hierarchy_key", table="f"),
                 operator="=",
-                right=ColumnRef(column="sales_hierarchy_key", table="sh")
+                right=ColumnRef(column="hierarchy_key", table="sh")
             ),
         }
 
