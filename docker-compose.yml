@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   app:
     build: .
@@ -17,8 +15,12 @@ services:
       - ANONYMIZE_SCHEMA=${ANONYMIZE_SCHEMA:-false}
       # Point Ollama at the sidecar service when it's running
       - OLLAMA_HOST=http://ollama:11434
+      # Cube.js integration
+      - CUBEJS_API_SECRET=${CUBEJS_API_SECRET:-change-this-secret-min-32-chars}
+      - CUBEJS_URL=http://cubejs:4000
     depends_on:
       - ollama
+      - cubejs
     restart: unless-stopped
 
   ollama:
@@ -35,6 +37,23 @@ services:
              sleep 5 &&
              ollama pull llama3.2:3b &&
              wait"
+
+  cubejs:
+    build: ./cubejs
+    container_name: cpg_cubejs
+    ports:
+      - "4000:4000"
+    environment:
+      - CUBEJS_API_SECRET=${CUBEJS_API_SECRET:-change-this-secret-min-32-chars}
+      - CUBEJS_DB_TYPE=duckdb
+      - CUBEJS_DB_DUCKDB_DATABASE_PATH=/data/cpg_multi_tenant.duckdb
+      - NODE_ENV=${NODE_ENV:-development}
+    volumes:
+      # Share the DuckDB file (read-only inside Cube.js)
+      - ./database:/data:ro
+      # Hot-reload schema in development — remove :ro to allow edits
+      - ./cubejs/schema:/cube/conf/schema:ro
+    restart: unless-stopped
 
 volumes:
   ollama_models:

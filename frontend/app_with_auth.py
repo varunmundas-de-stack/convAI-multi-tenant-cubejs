@@ -22,6 +22,8 @@ from security.rls import RowLevelSecurity, UserContext
 from security.auth import AuthManager, User
 from query_engine.executor import QueryExecutor
 from semantic_layer.orchestrator import QueryOrchestrator
+from semantic_layer.cubejs_adapter import CubeJSAdapter, CubeJSError
+from security.cubejs_token import generate_cubejs_token
 from query_engine.query_validator import QueryValidator
 import time
 import traceback
@@ -192,6 +194,23 @@ def api_me():
         'department': current_user.department,
         'sales_hierarchy_level': current_user.sales_hierarchy_level,
     })
+
+
+@app.route('/api/cubejs-token', methods=['GET'])
+@login_required
+def get_cubejs_token():
+    """Return a short-lived Cube.js JWT for the current user.
+
+    The React frontend (Dashboard tab) can use this token to call the
+    Cube.js API directly for live dashboard queries, bypassing Flask.
+    Flask itself also uses this token when forwarding chat queries to Cube.js.
+    """
+    try:
+        token = generate_cubejs_token(current_user)
+        cubejs_url = os.getenv('CUBEJS_URL', 'http://localhost:4000')
+        return jsonify({'token': token, 'cubejsUrl': cubejs_url})
+    except RuntimeError as exc:
+        return jsonify({'error': str(exc)}), 503
 
 
 @app.route('/')
@@ -545,9 +564,36 @@ def process_query():
         )
         secured_query = RowLevelSecurity.apply_security(semantic_query, user_context)
 
-        # Execute query
+        # Execute query via Cube.js (replaces AST builder + DuckDB executor)
         start_time = time.time()
-        result = components['orchestrator'].execute(secured_query)
+        try:
+            cubejs_token = generate_cubejs_token(current_user)
+            adapter = CubeJSAdapter()
+
+            if secured_query.intent.value == 'diagnostic':
+                # Diagnostic queries: delegate to orchestrator which chains
+                # multiple CubeJSAdapter calls via its existing workflow.
+                # The orchestrator still uses the legacy executor internally;
+                # swap it out for a CubeJS-backed executor when ready.
+                result = components['orchestrator'].execute(secured_query)
+            else:
+                cube_query = adapter.build_query(secured_query)
+                raw = adapter.execute(cube_query, cubejs_token)
+                result = {
+                    'query_type': 'single',
+                    'sql': raw.get('sql', ''),
+                    'results': raw.get('results', []),
+                    'metadata': {
+                        'row_count': len(raw.get('results', [])),
+                        'execution_time_ms': 0,
+                        'intent': secured_query.intent.value,
+                    },
+                }
+        except CubeJSError as cube_err:
+            # Cube.js unavailable or query failed — fall back to legacy pipeline
+            print(f"DEBUG: Cube.js error ({cube_err}), falling back to legacy executor")
+            result = components['orchestrator'].execute(secured_query)
+
         exec_time = (time.time() - start_time) * 1000
 
         # Format response (NO LLM Call #2 for security)

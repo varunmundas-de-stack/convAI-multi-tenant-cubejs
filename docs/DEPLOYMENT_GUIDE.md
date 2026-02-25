@@ -1,7 +1,7 @@
 # CPG Conversational AI — Deployment Guide
 
-> End-to-end setup guide for running the platform on a Windows 11 machine.
-> Covers system requirements, installation, data setup, and starting the app.
+> End-to-end setup guide for running the platform locally (Docker) or on AWS.
+> Covers system requirements, installation, data setup, Cube.js configuration, and starting the app.
 
 ---
 
@@ -10,65 +10,60 @@
 1. [System Requirements](#1-system-requirements)
 2. [Software Prerequisites](#2-software-prerequisites)
 3. [Clone the Repository](#3-clone-the-repository)
-4. [Python Environment](#4-python-environment)
-5. [LLM Setup](#5-llm-setup)
-6. [Database Initialisation](#6-database-initialisation)
-7. [Starting the Application](#7-starting-the-application)
-8. [Login Credentials](#8-login-credentials)
-9. [Environment Variables](#9-environment-variables)
+4. [Environment Variables](#4-environment-variables)
+5. [Docker Deployment (Recommended)](#5-docker-deployment-recommended)
+6. [Manual / Dev Deployment](#6-manual--dev-deployment)
+7. [Login Credentials](#7-login-credentials)
+8. [Architecture Overview](#8-architecture-overview)
+9. [Cube.js Semantic Layer](#9-cubejs-semantic-layer)
 10. [Sharing the App (ngrok / LAN)](#10-sharing-the-app-ngrok--lan)
 11. [AWS Cloud Deployment](#11-aws-cloud-deployment)
 12. [Windows Firewall & Ports](#12-windows-firewall--ports)
-13. [Auto-Start on Boot](#13-auto-start-on-boot)
-14. [Troubleshooting](#14-troubleshooting)
-15. [Directory Structure](#15-directory-structure)
-16. [Quick-Start Checklist](#16-quick-start-checklist)
+13. [Troubleshooting](#13-troubleshooting)
+14. [Directory Structure](#14-directory-structure)
+15. [Quick-Start Checklist](#15-quick-start-checklist)
 
 ---
 
 ## 1. System Requirements
 
-### Option A — Ollama (local LLM, no internet needed after setup)
+### Docker (recommended path)
 
 | Component | Minimum | Recommended |
 |---|---|---|
-| **OS** | Windows 11 Home/Pro 22H2+ | Windows 11 Pro 23H2+ |
+| **OS** | Windows 11 / macOS 13+ / Ubuntu 22.04 | Windows 11 Pro / macOS 14+ |
 | **CPU** | 4-core x64 | 8-core x64 |
 | **RAM** | 8 GB | 16 GB |
-| **Disk (free)** | 12 GB | 20 GB |
-| **GPU** | Not required | NVIDIA 6 GB VRAM (speeds up LLM) |
-| **Network** | Setup only | — |
+| **Disk (free)** | 15 GB | 25 GB |
+| **Network** | Setup only (model download ~2 GB) | — |
 
-### Option B — Claude API (recommended for demos, needs internet)
+### LLM option — Claude API (lighter, needs internet)
 
 | Component | Minimum |
 |---|---|
 | **RAM** | 4 GB |
-| **Disk (free)** | 2 GB |
+| **Disk (free)** | 5 GB |
 | **Network** | Always-on internet |
 | **Anthropic API key** | Required — get one at https://console.anthropic.com |
 
 > Claude API gives better query accuracy and requires no local model download.
-> See [Section 5.2](#52-option-b--claude-api-recommended) to enable it.
 
 ---
 
 ## 2. Software Prerequisites
 
-### 2.1 Python 3.11 or later
+### 2.1 Docker Desktop
 
-**Download:** https://www.python.org/downloads/windows/
-Choose the latest **Python 3.13.x Windows installer (64-bit)**.
+**Download:** https://www.docker.com/products/docker-desktop
 
-**During installation:**
-- Check **"Add Python to PATH"** on the first screen
-- Click **"Install Now"**
-
-**Verify:**
+Install and start Docker Desktop. Verify:
+```powershell
+docker --version
+docker compose version
 ```
-python --version
-pip --version
-```
+Expected: Docker 24+ and Compose v2+.
+
+> Docker handles Python, Node.js, Ollama, and Cube.js automatically — no manual installs needed for the standard deployment path.
 
 ---
 
@@ -76,350 +71,354 @@ pip --version
 
 **Download:** https://git-scm.com/download/win — use all default options.
 
-**Verify:**
-```
+```powershell
 git --version
 ```
 
-> If you have the project as a ZIP, skip this — extract and go to Section 4.
+> If you received the project as a ZIP, skip Git — extract and go to Section 4.
 
 ---
 
-### 2.3 Node.js 20+ (for React frontend build)
+### 2.3 Python 3.11+ (dev mode only)
 
-**Download:** https://nodejs.org — choose the **LTS** version.
+Only needed if running Flask outside Docker. Skip for standard Docker deployment.
 
-**Verify:**
-```
-node --version
-npm --version
-```
-
-> Node is only needed once to build the React frontend. It does not need to run permanently.
-
----
-
-### 2.4 Ollama (only if using local LLM — skip if using Claude API)
-
-**Download:** https://ollama.com/download — run the installer.
-Ollama installs as a Windows service and starts automatically.
-
-**Verify:**
-```
-ollama --version
-ollama list
-```
+**Download:** https://www.python.org/downloads/windows/ — choose Python 3.13.x (64-bit).
+During installation check **"Add Python to PATH"**.
 
 ---
 
 ## 3. Clone the Repository
 
-Open **PowerShell** or **Command Prompt** and run:
-
-```
+```powershell
 git clone https://github.com/varunmundas-de-stack/convAI-multi-tenant-cubejs.git
 cd convAI-multi-tenant-cubejs
 ```
 
-> If you received the project as a ZIP, extract it and `cd` into the folder instead.
-
 After cloning, confirm these folders exist:
 ```
+cubejs\          ← Cube.js semantic layer service (NEW)
 frontend\
 frontend_react\
 database\
 semantic_layer\
+security\
 llm\
 insights\
 query_engine\
-security\
-config\
-aws-deploy\
 docs\
-scripts\
+aws-deploy\
 ```
 
 ---
 
-## 4. Python Environment
+## 4. Environment Variables
 
-All commands below run from the project root folder.
+### 4.1 Create your `.env` file
 
-### 4.1 Create a virtual environment
+```powershell
+copy .env.example .env
+```
+
+Open `.env` — the defaults work for local development. For production, change the secrets:
+
+```env
+# Flask
+FLASK_SECRET_KEY=your-long-random-flask-secret
+
+# LLM — false = local Ollama, true = Claude API
+USE_CLAUDE_API=false
+ANTHROPIC_API_KEY=          # only needed when USE_CLAUDE_API=true
+ANONYMIZE_SCHEMA=false
+
+# Cube.js — shared secret between Flask (JWT signer) and Cube.js (JWT verifier)
+# Must be 32+ characters. Change this in production.
+CUBEJS_API_SECRET=cpg-sales-assistant-cubejs-secret-2026
+
+# Cube.js URL (internal Docker hostname — do not change for Docker Compose)
+CUBEJS_URL=http://cubejs:4000
+
+# Node environment for Cube.js container
+NODE_ENV=development
+```
+
+> **Important:** `CUBEJS_API_SECRET` must be identical in both Flask and Cube.js — they share the same `.env` file via Docker Compose so this is automatic.
+
+---
+
+## 5. Docker Deployment (Recommended)
+
+This is the standard path for testers, designers, and demo environments.
+One command starts everything: Flask, Ollama (LLM), and Cube.js.
+
+### 5.1 Build images (first time — ~5 minutes)
+
+```powershell
+docker compose build
+```
+
+What gets built:
+- **app** — Python/Flask + React frontend (built inside Docker)
+- **cubejs** — Cube.js server with DuckDB driver + jsonwebtoken
+
+### 5.2 Start all services
+
+```powershell
+docker compose up
+```
+
+Wait until you see all three of these lines:
+```
+cpg_cubejs            | 🚀 Cube.js server is listening on 4000
+cpg_sales_assistant   | Running on http://0.0.0.0:5000
+cpg_ollama            | Listening on [::]:11434
+```
+
+> **First start:** Ollama downloads `llama3.2:3b` (~2 GB). This takes 3–5 minutes depending on your connection. Subsequent starts are instant.
+
+### 5.3 Open in browser
 
 ```
+http://localhost:5000
+```
+
+Login with `nestle_admin / admin123` (see [Section 7](#7-login-credentials)).
+
+### 5.4 Stop everything
+
+```powershell
+Ctrl+C   # in the terminal running docker compose up
+```
+or from a separate terminal:
+```powershell
+docker compose down
+```
+
+### 5.5 Using Claude API instead of Ollama (optional)
+
+In `.env`, set:
+```env
+USE_CLAUDE_API=true
+ANTHROPIC_API_KEY=sk-ant-your-key-here
+```
+Then restart: `docker compose down && docker compose up`
+
+---
+
+## 6. Manual / Dev Deployment
+
+Use this only if you're developing the Python/Flask code outside Docker.
+
+### 6.1 Python environment
+
+```powershell
 python -m venv venv
 venv\Scripts\activate
-```
-
-Your prompt should now show `(venv)`. Re-run `venv\Scripts\activate` any time you open a new terminal.
-
-### 4.2 Install all dependencies
-
-```
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-This installs everything — Flask, DuckDB, Ollama client, Claude API client, auth packages, and test tools.
+### 6.2 Database initialisation (first time only)
 
-**Verify key packages:**
-```
-pip list | findstr /I "flask duckdb ollama bcrypt anthropic"
-```
-
----
-
-## 5. LLM Setup
-
-The app supports two LLM backends. Choose one.
-
-### 5.1 Option A — Ollama (local, offline)
-
-**Pull the model (~2 GB download, runs once):**
-```
-ollama pull llama3.2:3b
-```
-
-**Verify:**
-```
-ollama list
-```
-You should see `llama3.2:3b` listed.
-
-**Test it:**
-```
-ollama run llama3.2:3b "Say hello in one sentence"
-```
-
-**Keep Ollama running** (it installs as a Windows service — starts automatically on boot):
-```
-curl http://localhost:11434
-```
-Expected: `Ollama is running`
-
-If not running, start it manually:
-```
-ollama serve
-```
-
----
-
-### 5.2 Option B — Claude API (recommended)
-
-No model download needed. Requires an Anthropic API key.
-
-1. Get your API key: https://console.anthropic.com → API Keys → Create Key
-
-2. Set the environment variables before starting the app:
-   ```
-   set USE_CLAUDE_API=true
-   set ANTHROPIC_API_KEY=sk-ant-your-key-here
-   ```
-
-3. Ollama does **not** need to be installed when using this option.
-
-> Cost: ~$0.01–$0.05 per query. For light demo usage, typically under $1/day.
-
----
-
-## 6. Database Initialisation
-
-This step creates two database files. Run it once on first setup.
-
-```
-cd convAI-multi-tenant-cubejs
-venv\Scripts\activate
-```
-
-### 6.1 Create the users and insights database
-
-```
+```powershell
 python database\create_user_db.py
-```
-
-Expected output:
-```
-[OK] User database created at: ...database\users.db
-```
-
-### 6.2 Create the analytics database with tenant data
-
-```
 python database\create_multi_schema_demo.py
 ```
 
-This creates `database\cpg_multi_tenant.duckdb` with three isolated schemas:
-- `client_nestle` — Nestlé India sample sales data
-- `client_unilever` — Unilever India sample sales data
-- `client_itc` — ITC Limited sample sales data
+### 6.3 Build the React frontend (first time only)
 
-Expected output:
-```
-[OK] Multi-tenant database created at: ...database\cpg_multi_tenant.duckdb
-```
-
-### 6.3 Verify
-
-```
-dir database\*.db database\*.duckdb
-```
-
-Both files should appear.
-
----
-
-## 7. Starting the Application
-
-### 7.1 Build the React frontend (first time only)
-
-```
+```powershell
 cd frontend_react
 npm install
 npm run build
 cd ..
 ```
 
-This compiles the React app into `frontend\static\react\` where Flask serves it.
+### 6.4 Set environment variables
 
-> You only need to re-run this if you make changes to the React source in `frontend_react\src\`.
-
-### 7.2 Start the Flask app
-
+```powershell
+$env:FLASK_SECRET_KEY = "dev-secret"
+$env:CUBEJS_API_SECRET = "cpg-sales-assistant-cubejs-secret-2026"
+$env:CUBEJS_URL = "http://localhost:4000"   # if Cube.js running locally
 ```
+
+### 6.5 Start Ollama (if not using Claude API)
+
+```powershell
+ollama pull llama3.2:3b   # once
+ollama serve               # keep this terminal open
+```
+
+### 6.6 Start Cube.js (optional — app falls back to legacy pipeline without it)
+
+```powershell
+cd cubejs
+npm install
+npm start
+# runs on http://localhost:4000
+cd ..
+```
+
+### 6.7 Start Flask
+
+```powershell
 venv\Scripts\activate
 python frontend\app_with_auth.py
 ```
 
-You will see:
-```
-============================================================
-CPG Conversational AI Chatbot (RBAC Enabled)
-============================================================
-Open your browser and go to: http://localhost:5000
- * Running on http://0.0.0.0:5000
-```
-
-### 7.3 Open in browser
-
-```
-http://localhost:5000
-```
-
-The login page will appear.
-
-### 7.4 Quick-launch batch file
-
-A convenience script is included in `scripts\`:
-
-```
-scripts\start_chatbot.bat
-```
-
-Double-click it or run from PowerShell. It activates the venv and starts the app automatically.
-
 ---
 
-## 8. Login Credentials
+## 7. Login Credentials
 
-All users are created by `database\create_user_db.py`.
+All users are seeded by `database\create_user_db.py` (Docker runs this automatically).
 
 ### Standard users
 
 | Username | Password | Tenant | Role |
 |---|---|---|---|
-| `nestle_admin` | `admin123` | Nestlé India | Admin — full access |
+| `nestle_admin` | `admin123` | Nestlé India | Admin — full data access |
 | `nestle_analyst` | `analyst123` | Nestlé India | Analyst |
 | `unilever_admin` | `admin123` | Unilever India | Admin |
 | `unilever_analyst` | `analyst123` | Unilever India | Analyst |
 | `itc_admin` | `admin123` | ITC Limited | Admin |
 | `itc_analyst` | `analyst123` | ITC Limited | Analyst |
 
-### Sales hierarchy users (Nestlé — Insights tab enabled)
+### Sales hierarchy users — Nestlé (Row-Level Security demo)
 
 | Username | Password | Role | Data Scope |
 |---|---|---|---|
 | `nsm_rajesh` | `nsm123` | NSM | Full national view |
-| `zsm_amit` | `zsm123` | ZSM | Zone North only |
+| `zsm_amit` | `zsm123` | ZSM | Zone North (ZSM01) only |
 | `asm_rahul` | `asm123` | ASM | Area ZSM01_ASM1 only |
 | `so_field1` | `so123` | SO | Territory ZSM01_ASM1_SO01 only |
 
-> Row-Level Security is enforced — each user can only query data within their assigned scope.
+> Row-Level Security is enforced at the Cube.js `queryRewrite` layer — each user sees only data within their assigned sales hierarchy scope.
 
 ---
 
-## 9. Environment Variables
+## 8. Architecture Overview
 
-Set these in the terminal before starting the app, or add to Windows System Environment Variables.
-
-| Variable | Default | Description |
-|---|---|---|
-| `FLASK_SECRET_KEY` | `dev-secret-key-change-in-production` | Flask session signing key. **Always change in production.** |
-| `USE_CLAUDE_API` | `false` | Set `true` to use Claude API instead of Ollama |
-| `ANTHROPIC_API_KEY` | _(none)_ | Required when `USE_CLAUDE_API=true` |
-| `ANONYMIZE_SCHEMA` | `false` | Anonymise DB schema names before sending to external LLM |
-
-**Set in PowerShell:**
-```powershell
-$env:FLASK_SECRET_KEY = "your-long-random-secret"
-$env:USE_CLAUDE_API = "true"
-$env:ANTHROPIC_API_KEY = "sk-ant-your-key-here"
+```
+Browser (React)
+    ↓ login
+Flask / Python  (port 5000)
+    ├─ Authenticates user → issues Cube.js JWT
+    ├─ Intent Parser (Ollama / Claude API) → SemanticQuery
+    ├─ CubeJSAdapter → Cube.js query JSON
+    └─ Calls Cube.js REST API with JWT
+              ↓
+Cube.js  (port 4000, Node.js)
+    ├─ Validates JWT → extracts security context
+    ├─ queryRewrite → injects RLS filter (SO/ASM/ZSM)
+    ├─ Selects DuckDB schema (client_nestle / client_unilever / client_itc)
+    ├─ Generates SQL
+    └─ Executes against DuckDB
+              ↓
+Flask formats result → Browser
 ```
 
-**Set permanently (Windows):**
-1. Start → search "Edit the system environment variables"
-2. Click **Environment Variables** → **New** under System variables
+**Query path:**
+1. User types question → Flask parses NL intent
+2. Flask calls Cube.js REST `/cubejs-api/v1/load` with JWT
+3. Cube.js runs RLS-filtered SQL against DuckDB
+4. Flask formats result as HTML table / chart data
+5. React renders response
+
+**Fallback:** If Cube.js is unreachable, Flask automatically falls back to the legacy AST SQL pipeline — queries always return data.
+
+---
+
+## 9. Cube.js Semantic Layer
+
+Cube.js is the query engine introduced in this version. It replaces the custom AST SQL builder for all non-diagnostic queries.
+
+### What Cube.js does
+
+| Responsibility | Implementation |
+|---|---|
+| Multi-tenant schema switching | `contextToAppId` + `COMPILE_CONTEXT.securityContext.clientId` |
+| JWT authentication | `checkAuth` validates Flask-issued tokens |
+| Row-level security | `queryRewrite` injects hierarchy code filter |
+| SQL generation | Cube.js schema files → DuckDB SQL |
+| Query execution | DuckDB driver (`@cubejs-backend/duckdb-driver`) |
+
+### Schema files
+
+Located in `cubejs/schema/`:
+
+| File | Purpose |
+|---|---|
+| `FactSecondarySales.js` | Main fact table — 6 measures, 6 joins |
+| `DimProduct.js` | Brand, category, SKU hierarchy |
+| `DimGeography.js` | State, district, town hierarchy |
+| `DimCustomer.js` | Distributor, retailer, outlet type |
+| `DimChannel.js` | Sales channel |
+| `DimDate.js` | Year, quarter, month, week grains |
+| `DimSalesHierarchy.js` | SO → ASM → ZSM → NSM codes (used for RLS) |
+
+### Measures available
+
+| Metric | Cube.js member |
+|---|---|
+| Secondary Sales Value | `FactSecondarySales.secondary_sales_value` |
+| Secondary Sales Volume | `FactSecondarySales.secondary_sales_volume` |
+| Gross Sales Value | `FactSecondarySales.gross_sales_value` |
+| Discount Amount | `FactSecondarySales.discount_amount` |
+| Margin Amount | `FactSecondarySales.margin_amount` |
+| Invoice Count | `FactSecondarySales.invoice_count` |
+
+### Verify Cube.js is running
+
+From a browser or terminal (after `docker compose up`):
+```
+http://localhost:4000/cubejs-api/v1/meta
+```
+Expected: `{"error":"Authorization header isn't set"}` — confirms Cube.js is up and auth is enforced.
 
 ---
 
 ## 10. Sharing the App (ngrok / LAN)
 
-### Option A — ngrok (share publicly via URL, works from anywhere)
+### Option A — ngrok (public URL, remote demos)
 
-Useful for remote demos where attendees are not on the same network.
+```powershell
+# Install
+winget install ngrok.ngrok
 
-1. Download ngrok: https://ngrok.com/download (or `winget install ngrok.ngrok`)
-2. Sign up free at https://dashboard.ngrok.com and get your authtoken
-3. Configure:
-   ```
-   ngrok config add-authtoken YOUR_TOKEN
-   ```
-4. Start the app on port 5000, then in a second terminal:
-   ```
-   ngrok http 5000
-   ```
-5. Share the `https://xxxx.ngrok-free.app` URL with attendees
+# Authenticate (one time)
+ngrok config add-authtoken YOUR_TOKEN
 
-> The ngrok window must stay open for the URL to work. Free tier generates a new random URL on each restart.
+# Start tunnel (app must be running on port 5000)
+ngrok http 5000
+```
 
-### Option B — LAN IP (in-room demo, same Wi-Fi)
+Share the `https://xxxx.ngrok-free.app` URL with attendees.
 
-No extra software needed. Everyone on the same network accesses via your machine's IP.
+> Free tier generates a new URL on each restart. Keep the ngrok terminal open.
 
-1. Find your IP:
-   ```
-   ipconfig
-   ```
-   Look for **IPv4 Address** (e.g. `192.168.1.100`)
+### Option B — LAN IP (same Wi-Fi)
 
-2. Share: `http://192.168.1.100:5000`
+```powershell
+ipconfig   # find IPv4 Address, e.g. 192.168.1.100
+```
 
-3. Allow port 5000 through Windows Firewall (see [Section 12](#12-windows-firewall--ports))
+Share: `http://192.168.1.100:5000`
+
+Allow port 5000 through Windows Firewall (see [Section 12](#12-windows-firewall--ports)).
 
 ---
 
 ## 11. AWS Cloud Deployment
 
-For a production-grade cloud deployment on AWS EC2, all scripts are in `aws-deploy\`.
-
-See: [`aws-deploy/README.md`](../aws-deploy/README.md)
+All scripts are in `aws-deploy\`. See [`aws-deploy/README.md`](../aws-deploy/README.md) for full details.
 
 **Quick summary:**
-- Launch EC2 `t3.medium` (Ubuntu 22.04)
+- Launch EC2 `t3.medium` (Ubuntu 22.04, 4 GB RAM minimum)
 - Run `aws-deploy/setup.sh` on the instance
-- Set `ANTHROPIC_API_KEY` in `.env`
+- Copy `.env` with production secrets (especially `CUBEJS_API_SECRET`)
+- `docker compose up -d`
 - App runs behind Nginx on port 80
-- Cost: ~$33/month
+- Estimated cost: ~$33/month
 
 ---
 
@@ -428,7 +427,10 @@ See: [`aws-deploy/README.md`](../aws-deploy/README.md)
 | Service | Port | When used |
 |---|---|---|
 | Flask app | **5000** | Always |
+| Cube.js API | **4000** | Always (query engine) |
 | Ollama LLM | **11434** | When `USE_CLAUDE_API=false` |
+
+> Ports 4000 and 11434 are internal Docker ports — only port 5000 needs to be opened for LAN/external access.
 
 ### Allow port 5000 for LAN access
 
@@ -438,205 +440,189 @@ See: [`aws-deploy/README.md`](../aws-deploy/README.md)
 
 ---
 
-## 13. Auto-Start on Boot
+## 13. Troubleshooting
 
-Create `start_cpg_app.bat` in the project root:
+### Docker
 
-```bat
-@echo off
-cd /d "C:\path\to\convAI-multi-tenant-cubejs"
-call venv\Scripts\activate
-set FLASK_SECRET_KEY=your-secret-key-here
-python frontend\app_with_auth.py >> logs\app.log 2>&1
+**`docker compose up` — Cube.js exits immediately**
+```powershell
+docker compose logs cubejs
+```
+Common cause: `CUBEJS_API_SECRET` not set in `.env`. Check `.env` exists and has the key.
+
+**`cpg_cubejs` starts but queries fall back to legacy pipeline**
+
+Flask logs will show: `Cube.js error (...), falling back to legacy executor`
+
+Check Cube.js logs for the root cause:
+```powershell
+docker compose logs cubejs --tail=50
 ```
 
-Create the logs folder:
+**Ollama model download stuck**
+
+First start downloads `llama3.2:3b` (~2 GB). Wait for:
 ```
-mkdir logs
+cpg_ollama | pulling manifest
+cpg_ollama | pulling ...done
+```
+If it hangs, restart: `docker compose restart ollama`
+
+**Port 5000 already in use**
+```powershell
+netstat -ano | findstr :5000
+taskkill /PID <pid> /F
 ```
 
-Then add it to **Task Scheduler**:
-1. Start → **Task Scheduler → Create Basic Task**
-2. Name: `CPG Analytics App`
-3. Trigger: **When the computer starts**
-4. Action: **Start a program** → browse to `start_cpg_app.bat`
-5. Check **Run with highest privileges** → Finish
+### Manual / Dev mode
 
----
-
-## 14. Troubleshooting
-
-### `sqlite3.OperationalError: unable to open database file`
-Databases not created yet.
+**`ModuleNotFoundError: No module named 'jwt'`**
+```powershell
+pip install PyJWT
 ```
+
+**`ModuleNotFoundError: No module named 'flask_login'`**
+```powershell
+pip install -r requirements.txt
+```
+
+**`sqlite3.OperationalError: unable to open database file`**
+```powershell
 python database\create_user_db.py
 python database\create_multi_schema_demo.py
 ```
 
-### `ModuleNotFoundError: No module named 'flask_login'`
-```
-pip install -r requirements.txt
-```
+**Login returns 500 error**
 
-### Login returns 500 error
-Virtual environment not active. Start fresh:
-```
+Virtual environment not active:
+```powershell
 venv\Scripts\activate
 python frontend\app_with_auth.py
 ```
 
-### `Connection refused` on port 11434 (Ollama)
-```
-ollama serve
-```
-Leave that terminal open, then start Flask in a second terminal.
-
-### Insights tab is empty
-Wait 15–30 seconds after app starts — insights are generated in a background thread.
-Check terminal for `[Insights]` log lines.
-
-### Port 5000 already in use
-```
-netstat -ano | findstr :5000
-taskkill /PID <pid> /F
-```
-Or change the port in the last line of `frontend\app_with_auth.py`:
-```python
-app.run(debug=True, host='0.0.0.0', port=5001, use_reloader=False)
-```
-
-### `bcrypt` fails to install on Python 3.13
-```
-pip install "bcrypt>=4.1.0"
-```
-
-### React frontend not loading (blank page / 404 on `/`)
-The React build hasn't been run yet:
-```
+**React frontend blank page / 404**
+```powershell
 cd frontend_react
 npm install
 npm run build
 cd ..
 ```
 
+**Insights tab empty**
+
+Wait 15–30 seconds — insights generate in a background thread on startup. Watch for `[Insights]` lines in the terminal.
+
 ---
 
-## 15. Directory Structure
+## 14. Directory Structure
 
 ```
 convAI-multi-tenant-cubejs\
 │
-├── frontend\                        # Flask web application
-│   ├── app_with_auth.py             # Main app entry point (RBAC-enabled)
-│   └── static\
-│       └── react\                   # Built React frontend (generated by npm run build)
+├── cubejs\                          # ← NEW: Cube.js semantic layer service
+│   ├── cube.js                      # Main config: JWT auth, RLS, DuckDB driver
+│   ├── package.json                 # Node deps: @cubejs-backend/server, duckdb-driver, jsonwebtoken
+│   ├── Dockerfile                   # Cube.js container build
+│   ├── .env.example                 # Cube.js env vars template
+│   └── schema\                      # Cube definitions (one per table)
+│       ├── FactSecondarySales.js    # 6 measures + 6 joins
+│       ├── DimProduct.js
+│       ├── DimGeography.js
+│       ├── DimCustomer.js
+│       ├── DimChannel.js
+│       ├── DimDate.js
+│       └── DimSalesHierarchy.js    # SO/ASM/ZSM/NSM codes for RLS
 │
-├── frontend_react\                  # React source code
+├── frontend\                        # Flask web application
+│   ├── app_with_auth.py             # Main app — RBAC, Cube.js integration, all API endpoints
+│   └── static\react\                # Built React frontend (generated by npm run build)
+│
+├── frontend_react\                  # React source code (Vite + Tailwind)
 │   ├── src\
 │   │   ├── components\              # ChatTab, DashboardTab, InsightsTab, etc.
 │   │   ├── pages\                   # LoginPage, DashboardPage
-│   │   └── api\client.js            # API client
+│   │   └── api\client.js            # API client (calls Flask endpoints)
 │   ├── package.json
 │   └── vite.config.js
 │
-├── database\                        # Database scripts and files
-│   ├── create_user_db.py            # Creates users.db
-│   ├── create_multi_schema_demo.py  # Creates cpg_multi_tenant.duckdb
-│   ├── generate_cpg_data.py         # Sample data generator
-│   ├── multi_db_manager.py          # Multi-DB connection manager
-│   ├── schema_cpg.sql               # CPG schema reference
-│   ├── users.db                     # ← created on first run
-│   └── cpg_multi_tenant.duckdb      # ← created on first run
-│
-├── semantic_layer\                  # NL → SQL translation
-│   ├── semantic_layer.py
-│   ├── query_builder.py
-│   ├── orchestrator.py
+├── semantic_layer\                  # NL → query translation
+│   ├── cubejs_adapter.py            # ← NEW: SemanticQuery → Cube.js JSON + REST caller
+│   ├── semantic_layer.py            # YAML config parser
+│   ├── query_builder.py             # Legacy AST SQL builder (fallback)
+│   ├── orchestrator.py              # Multi-query diagnostic workflow
 │   ├── validator.py
-│   ├── config_cpg.yaml              # Master config template
-│   └── configs\                     # Per-tenant configs
+│   └── configs\                     # Per-tenant YAML configs
 │       ├── client_nestle.yaml
 │       ├── client_unilever.yaml
 │       └── client_itc.yaml
 │
+├── security\                        # Auth and access control
+│   ├── cubejs_token.py              # ← NEW: JWT generator for Cube.js auth
+│   ├── auth.py                      # Flask-Login user auth
+│   ├── rls.py                       # Row-Level Security filters
+│   └── audit.py                     # Query audit trail
+│
+├── database\                        # Database scripts and files
+│   ├── create_user_db.py            # Creates users.db
+│   ├── create_multi_schema_demo.py  # Creates cpg_multi_tenant.duckdb
+│   ├── users.db                     # ← created on first run
+│   └── cpg_multi_tenant.duckdb      # ← created on first run (11.5 MB)
+│
 ├── llm\                             # LLM intent parsing
 │   └── intent_parser_v2.py          # Ollama + Claude dual-provider parser
 │
-├── insights\                        # Targeted insights engine
-│   └── hierarchy_insights_engine.py
+├── insights\
+│   └── hierarchy_insights_engine.py # Proactive insights engine
 │
-├── query_engine\                    # SQL execution
+├── query_engine\                    # Legacy SQL execution (fallback + diagnostics)
 │   ├── executor.py
 │   └── query_validator.py
 │
-├── security\                        # Auth and access control
-│   ├── auth.py
-│   ├── rls.py                       # Row-Level Security
-│   └── audit.py
-│
-├── config\
-│   └── database_config.yaml         # Multi-tenant DB connection config
-│
 ├── aws-deploy\                      # AWS EC2 deployment scripts
-│   ├── setup.sh                     # One-time EC2 setup
-│   ├── deploy.sh                    # Re-deploy after code changes
-│   ├── docker-compose.prod.yml      # Production Docker config
-│   ├── nginx.conf                   # Nginx reverse proxy config
-│   └── README.md                    # AWS deployment guide
 │
 ├── docs\                            # Documentation
 │   ├── DEPLOYMENT_GUIDE.md          # This file
-│   ├── ARCHITECTURE.md
-│   ├── SETUP_GUIDE.md
-│   └── MULTI_DB_SETUP.md
+│   └── ARCHITECTURE.md
 │
-├── scripts\                         # Utility scripts
-│   ├── start_chatbot.bat            # Quick-launch the app
-│   ├── setup_rbac.bat               # One-time RBAC setup helper
-│   └── explore_db.bat               # Database explorer
-│
-├── tests\
-│   └── test_anonymization.py
-│
-├── Dockerfile                       # Docker image build
-├── docker-compose.yml               # Local Docker (with Ollama)
+├── .env.example                     # Environment variables template
+├── .env                             # Your local config (git-ignored)
+├── Dockerfile                       # Flask + React container build
+├── docker-compose.yml               # Orchestrates app + ollama + cubejs
 └── requirements.txt                 # Python dependencies
 ```
 
 ---
 
-## 16. Quick-Start Checklist
+## 15. Quick-Start Checklist
 
-Use this before going live or handing off to someone new.
+Use this before handing off to a tester, designer, or running a demo.
 
-**Environment:**
-- [ ] Windows 11, 8+ GB RAM (or 4 GB if using Claude API)
-- [ ] Python 3.11+ installed and on PATH
-- [ ] Node.js 20+ installed (for React build)
-- [ ] Git installed
+### Docker path (standard)
 
-**Setup:**
-- [ ] Repo cloned from https://github.com/varunmundas-de-stack/convAI-multi-tenant-cubejs
-- [ ] `venv\Scripts\activate` active
-- [ ] `pip install -r requirements.txt` completed successfully
-- [ ] React built: `cd frontend_react && npm install && npm run build`
-- [ ] `python database\create_user_db.py` ran successfully
-- [ ] `python database\create_multi_schema_demo.py` ran successfully
-- [ ] `database\users.db` exists
-- [ ] `database\cpg_multi_tenant.duckdb` exists
-
-**LLM (choose one):**
-- [ ] Ollama: `ollama pull llama3.2:3b` done and `ollama serve` is running
-- [ ] Claude API: `USE_CLAUDE_API=true` and `ANTHROPIC_API_KEY` set
-
-**Verification:**
-- [ ] `python frontend\app_with_auth.py` starts without errors
-- [ ] Browser opens `http://localhost:5000` and shows login page
+- [ ] Docker Desktop installed and running
+- [ ] Repo cloned from `https://github.com/varunmundas-de-stack/convAI-multi-tenant-cubejs`
+- [ ] `.env` file created from `.env.example` (`copy .env.example .env`)
+- [ ] `CUBEJS_API_SECRET` set in `.env` (32+ characters)
+- [ ] `docker compose build` completed without errors
+- [ ] `docker compose up` shows all 3 services started (app, ollama, cubejs)
+- [ ] Browser opens `http://localhost:5000` — login page visible
 - [ ] Login with `nestle_admin / admin123` succeeds
-- [ ] Chat tab: `"What are total sales?"` returns a number
+- [ ] Chat tab: `"show top 5 brands by sales"` returns a table
+- [ ] Docker logs show `[Cube.js] Load Request` — confirms Cube.js is handling queries
 - [ ] Insights tab loads (wait 15 sec on first start)
-- [ ] Dashboard tab loads with charts
+- [ ] Dashboard tab loads with KPI cards and charts
+- [ ] Login as `so_field1 / so123` — same query returns fewer rows (RLS working)
+- [ ] Login as `unilever_admin / admin123` — different brand names (tenant isolation working)
+
+### Cube.js sanity check
+
+Open in browser while app is running:
+```
+http://localhost:4000/cubejs-api/v1/meta
+```
+Expected response: `{"error":"Authorization header isn't set"}`
+This confirms Cube.js is up and its JWT guard is active.
 
 ---
 
-*Last updated: February 2026*
+*Last updated: February 2026 — Cube.js semantic layer integration*
